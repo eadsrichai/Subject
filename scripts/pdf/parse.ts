@@ -192,6 +192,28 @@ export function parseDocument(lines: Line[]): Extracted {
     }
   }
 
+  // A block whose code is not in any table but whose name matches exactly one
+  // table course still lacking a block is that course with a misprinted code.
+  const misprintedCode = new Map<string, string>();
+  for (const [blockCode, b] of [...blocks]) {
+    if (tableCourses.has(blockCode)) continue;
+    const name = foldThai(b.row.nameTh);
+    const matches = [...tableCourses.keys()].filter(
+      (code) => !blocks.has(code) && foldThai(tableCourses.get(code)!.row.nameTh) === name,
+    );
+    if (matches.length !== 1) continue;
+    blocks.set(matches[0], b);
+    blocks.delete(blockCode);
+    misprintedCode.set(matches[0], blockCode);
+  }
+
+  // The booklet omits descriptions for whole top-level categories ("ตามเอกสารนอกเล่ม");
+  // a missing description is only suspicious where sibling courses have one.
+  const rootOf = (categoryCode: string | null) => categoryCode?.split(".")[0] ?? null;
+  const rootsWithDescriptions = new Set(
+    [...tableCourses].filter(([code]) => blocks.has(code)).map(([, t]) => rootOf(t.categoryCode)),
+  );
+
   const codes = [...new Set([...tableCourses.keys(), ...blocks.keys()])].sort();
   const courses = codes.map((code): ExtractedCourse => {
     const table = tableCourses.get(code);
@@ -201,7 +223,12 @@ export function parseDocument(lines: Line[]): Extracted {
     const hours = (r: CourseRow) => `${r.theoryHours}-${r.practiceHours}-${r.credits}`;
 
     if (!table) reasons.push("ไม่พบในตารางโครงสร้าง");
-    if (!b) reasons.push("ไม่พบคำอธิบายรายวิชา");
+    if (!b && rootsWithDescriptions.has(rootOf(table!.categoryCode))) {
+      reasons.push("ไม่พบคำอธิบายรายวิชา");
+    }
+    if (misprintedCode.has(code)) {
+      reasons.push(`รหัสวิชาในคำอธิบาย (${misprintedCode.get(code)}) ไม่ตรงกับตาราง`);
+    }
     if (table && b && hours(table.row) !== hours(b.row)) {
       reasons.push(`ท-ป-น ไม่ตรงกัน (ตาราง ${hours(table.row)}, คำอธิบาย ${hours(b.row)})`);
     }
