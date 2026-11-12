@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model Category {
+  id         Int        @id @default(autoincrement())
+  code       String     @unique
+  name       String
+  minCredits Int?
+  note       String?
+  sortOrder  Int        @default(0)
+  parentId   Int?
+  parent     Category?  @relation("Tree", fields: [parentId], references: [id], onDelete: Restrict)
+  children   Category[] @relation("Tree")
+  courses    Course[]
+}
+
+model Course {
+  id              Int       @id @default(autoincrement())
+  code            String    @unique
+  nameTh          String
+  nameEn          String    @default("")
+  theoryHours     Int
+  practiceHours   Int
+  credits         Int
+  standardRef     String?
+  learningOutcome String?
+  objectives      String?
+  competencies    String?
+  description     String?
+  categoryId      Int
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  sourcePage      Int?
+  needsReview     Boolean   @default(false)
+  reviewNote      String?
+  editedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([code(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([nameTh(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([nameEn(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(STAFF)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
