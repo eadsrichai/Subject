@@ -84,7 +84,7 @@ tests/unit, tests/db, tests/e2e, tests/fixtures
 npx create-next-app@15 _scaffold --ts --tailwind --eslint --app --no-src-dir --import-alias "@/*" --use-npm --no-turbopack --skip-install
 ```
 
-ย้ายทุกอย่างใน `_scaffold` (ยกเว้น `.git`) มาที่ราก ทับ `package.json` เดิม ลบ `_scaffold` แล้วรวม `.gitignore` เดิมเข้ากับของใหม่ เพิ่มบรรทัด `Data/extracted/` ไม่ต้อง ignore (ให้ commit ได้) และเพิ่ม `test-results/`, `playwright-report/`
+ย้ายทุกอย่างใน `_scaffold` (ยกเว้น `.git`) มาที่ราก ทับ `package.json` เดิม ลบ `_scaffold` แล้วรวม `.gitignore` เดิมเข้ากับของใหม่ และเพิ่ม `test-results/`, `playwright-report/`, `Data/*.pdf` (ไฟล์ใน `Data/extracted/` ให้ commit ตามปกติ)
 
 - [ ] **Step 2: ติดตั้ง dependency**
 
@@ -232,8 +232,10 @@ test.each([
   ["เปน", "เป็น"],
   ["คําสั่ง", "คำสั่ง"],                    // นิคหิต + สระอา → สระอำ
   ["ค ำนำ", "คำนำ"],                       // ช่องว่างก่อนสระอำ
-  ["ส านักงาน", "สำนักงาน"],               // สระอำที่ตัว ำ หาย เหลือช่องว่าง+า: ไม่แก้ (เดาไม่ได้)
-].slice(0, 6))("%s → %s", (input, want) => expect(normalizeThai(input)).toBe(want));
+])("%s → %s", (input, want) => expect(normalizeThai(input)).toBe(want));
+
+// สระอำที่หายจนเหลือ "ช่องว่าง + า" เดาคืนไม่ได้ ต้องคงไว้ตามเดิมให้คนแก้
+test("ไม่เดาสระอำที่หายไป", () => expect(normalizeThai("ส านักงาน")).toBe("ส านักงาน"));
 
 test("ลบสัญลักษณ์ PUA ของฟอนต์สัญลักษณ์", () => expect(normalizeThai(" หลักการ")).toBe("หลักการ"));
 test("ยุบช่องว่างซ้ำและตัดหัวท้าย", () => expect(normalizeThai("  ก   ข ")).toBe("ก ข"));
