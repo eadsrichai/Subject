@@ -159,6 +159,12 @@ export async function listCategories(): Promise<CategoryNode[]> {
   return tree.map((c) => ({ ...c, courseCount: totals.get(c.id)!.courses }));
 }
 
+/** Distinct credit values in use, for the credits filter. */
+export async function listCreditValues(): Promise<number[]> {
+  const rows = await db.course.findMany({ distinct: ["credits"], select: { credits: true }, orderBy: { credits: "asc" } });
+  return rows.map((r) => r.credits);
+}
+
 export async function getStats(): Promise<{
   totalCourses: number;
   byCategory: { code: string; name: string; depth: number; courses: number; credits: number; minCredits: number | null }[];
