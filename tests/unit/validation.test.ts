@@ -28,6 +28,23 @@ test("ตัดช่องว่างหัวท้ายและแปล�
     needsReview: false,
   }));
 
+test("ข้อความที่วางจาก PDF ถูกแก้อักขระไทย: ชื่อยุบช่องว่าง ข้อความยาวคงการขึ้นบรรทัด", () =>
+  expect(
+    courseSchema.parse({
+      ...valid,
+      nameTh: "ค ำอธิบาย  กลุม",
+      nameEn: "Web  Design",
+      objectives: "1. ใชงาน  คําสั่ง\n2. ซอฟตแวร",
+    }),
+  ).toMatchObject({
+    nameTh: "คำอธิบาย กลุ่ม",
+    nameEn: "Web Design",
+    objectives: "1. ใช้งาน คำสั่ง\n2. ซอฟต์แวร์",
+  }));
+
+test("ชื่อหมวดที่วางจาก PDF ถูกแก้อักขระไทย", () =>
+  expect(categorySchema.parse({ code: "9", name: "กลุมใหม" }).name).toBe("กลุ่มใหม่"));
+
 test("ค่าจากฟอร์ม (สตริง) ถูกแปลงเป็นตัวเลขและ boolean", () =>
   expect(
     courseSchema.parse({ ...valid, theoryHours: "2", practiceHours: "0", credits: "3", categoryId: "7", needsReview: "on" }),

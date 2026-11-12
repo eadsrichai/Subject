@@ -106,8 +106,10 @@ test("% _ และ \\ เป็นตัวอักษรธรรมดา", 
 test("กรองหมวดรวมหมวดย่อย", async () =>
   expect((await searchCourses(f({ categoryId: cat1.id }))).total).toBe(25));
 
-test("หมวดที่ไม่มีจริงให้ผลว่าง ไม่ล้ม", async () =>
-  expect((await searchCourses(f({ categoryId: 999999 }))).total).toBe(0));
+test("หมวดที่ไม่มีจริง (เช่น ลิงก์เก่าไปหมวดที่ถูกลบ) ถูกเพิกเฉย ไม่ล้ม", async () => {
+  expect((await searchCourses(f({ categoryId: 999999 }))).total).toBe(27);
+  expect(await allMatchingCourses(f({ categoryId: 999999 }))).toHaveLength(27);
+});
 
 test("กรองหน่วยกิตร่วมกับคำค้น", async () => {
   expect((await searchCourses(f({ q: "เว็บ", credits: 3 }))).total).toBe(1);

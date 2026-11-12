@@ -6,7 +6,7 @@ const UNCATEGORISED = { code: "NONE", name: "ยังไม่จัดหม�
 
 /**
  * Loads extracted curriculum data. Safe to re-run: rows are matched by code,
- * and courses already edited on the website are left alone unless `force`.
+ * and courses edited on the website (and every existing category) are left alone unless `force`.
  */
 export async function seedFromExtracted(
   db: PrismaClient,
@@ -26,10 +26,11 @@ export async function seedFromExtracted(
       sortOrder: cat.sortOrder,
       parentId: cat.parentCode ? (categoryIds.get(cat.parentCode) ?? null) : null,
     };
+    // Categories carry no edit stamp, so any existing row may have been changed on the website.
     const row = await db.category.upsert({
       where: { code: cat.code },
       create: { code: cat.code, ...fields },
-      update: fields,
+      update: opts.force ? fields : {},
     });
     categoryIds.set(cat.code, row.id);
   }

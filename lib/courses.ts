@@ -68,7 +68,11 @@ async function buildWhere(f: CourseFilter): Promise<Prisma.CourseWhereInput> {
     const contains = { contains: escapeLike(f.q), mode: "insensitive" as const };
     where.OR = [{ code: contains }, { nameTh: contains }, { nameEn: contains }, { description: contains }];
   }
-  if (f.categoryId !== null) where.categoryId = { in: withDescendants(await categoryTree(), f.categoryId) };
+  if (f.categoryId !== null) {
+    // An unknown id (e.g. an old link to a deleted category) is ignored rather than matching nothing.
+    const ids = withDescendants(await categoryTree(), f.categoryId);
+    if (ids.length > 0) where.categoryId = { in: ids };
+  }
   if (f.credits !== null) where.credits = f.credits;
   return where;
 }

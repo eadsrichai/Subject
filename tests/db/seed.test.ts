@@ -68,6 +68,28 @@ test("ไม่ทับวิชาที่แก้ผ่านเว็บ �
   expect(forced.editedAt).toBeNull();
 });
 
+test("ไม่ทับหมวดที่แก้ผ่านเว็บ เว้นแต่ force", async () => {
+  await seedFromExtracted(db, data);
+  const top = await db.category.findUniqueOrThrow({ where: { code: "1" } });
+  await db.category.update({
+    where: { code: "1.1" },
+    data: { name: "กลุ่มที่เปลี่ยนชื่อ", minCredits: 9, sortOrder: 7, parentId: null },
+  });
+  await seedFromExtracted(db, data);
+  expect(await db.category.findUniqueOrThrow({ where: { code: "1.1" } })).toMatchObject({
+    name: "กลุ่มที่เปลี่ยนชื่อ",
+    minCredits: 9,
+    sortOrder: 7,
+    parentId: null,
+  });
+  await seedFromExtracted(db, data, { force: true });
+  expect(await db.category.findUniqueOrThrow({ where: { code: "1.1" } })).toMatchObject({
+    name: "กลุ่ม",
+    minCredits: 6,
+    parentId: top.id,
+  });
+});
+
 test("ensureAdmin สร้าง ADMIN ครั้งเดียวและไม่เปลี่ยนรหัสผ่านของบัญชีที่มีอยู่", async () => {
   await ensureAdmin(db, " Admin@X.th ", "secret-1");
   await ensureAdmin(db, "admin@x.th", "secret-2");

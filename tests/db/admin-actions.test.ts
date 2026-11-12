@@ -41,6 +41,13 @@ test("แก้ไข: ล้าง needsReview และ reviewNote เมื�
   expect(after.editedAt).toBeInstanceOf(Date);
 });
 
+test("ชื่อที่วางจาก PDF (สระอำแยกตัว) ค้นหาเจอด้วยคำที่พิมพ์ปกติ", async () => {
+  const { searchCourses } = await import("@/lib/courses");
+  expect(await saveCourse(null, input({ nameTh: "การจัดทําคําอธิบาย" }))).toEqual({ ok: true });
+  const r = await searchCourses({ q: "จัดทำคำอธิบาย", categoryId: null, credits: null, page: 1 });
+  expect(r.items.map((c) => c.nameTh)).toEqual(["การจัดทำคำอธิบาย"]);
+});
+
 test("ข้อมูลไม่ผ่านการตรวจ → คืนข้อผิดพลาดรายช่อง และไม่บันทึก", async () => {
   expect(await saveCourse(null, input({ nameTh: " " }))).toEqual({ ok: false, errors: { nameTh: "กรุณากรอกชื่อวิชา" } });
   expect(await db.course.count()).toBe(0);
