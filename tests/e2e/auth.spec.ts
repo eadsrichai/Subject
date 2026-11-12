@@ -21,7 +21,7 @@ test("รหัสผ่านผิดและอีเมลที่ไม�
 
 test("STAFF ล็อกอินได้ ไม่เห็นเมนูผู้ใช้ แล้วออกจากระบบ", async ({ page }) => {
   await loginAs(page, STAFF);
-  await expect(page.getByText("ยินดีต้อนรับ").or(page.getByRole("heading", { name: "ภาพรวม" }))).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ภาพรวม" })).toBeVisible();
   await expect(page.getByRole("link", { name: "ผู้ใช้", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "ออกจากระบบ" }).click();
   await expect(page).toHaveURL(/\/login/);
