@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { categorySchema, courseSchema, fieldErrors } from "@/lib/validation";
+import { categorySchema, courseSchema, fieldErrors, parsePlacements, programSchema } from "@/lib/validation";
 
 const valid = {
   code: "31900-0001",
@@ -8,7 +8,7 @@ const valid = {
   theoryHours: 1,
   practiceHours: 4,
   credits: 3,
-  categoryId: 5,
+  placements: [{ programId: 1, categoryId: 5 }],
 };
 
 test.each([
@@ -47,8 +47,8 @@ test("ชื่อหมวดที่วางจาก PDF ถูกแก้
 
 test("ค่าจากฟอร์ม (สตริง) ถูกแปลงเป็นตัวเลขและ boolean", () =>
   expect(
-    courseSchema.parse({ ...valid, theoryHours: "2", practiceHours: "0", credits: "3", categoryId: "7", needsReview: "on" }),
-  ).toMatchObject({ theoryHours: 2, practiceHours: 0, credits: 3, categoryId: 7, needsReview: true }));
+    courseSchema.parse({ ...valid, theoryHours: "2", practiceHours: "0", credits: "3", placements: [{ programId: "2", categoryId: "7" }], needsReview: "on" }),
+  ).toMatchObject({ theoryHours: 2, practiceHours: 0, credits: 3, placements: [{ programId: 2, categoryId: 7 }], needsReview: true }));
 
 test("ชั่วโมงติดลบ ทศนิยม เกิน 99 ว่าง หรือไม่ใช่ตัวเลข ไม่ผ่าน", () => {
   for (const v of [-1, 1.5, 100, "", "abc", null]) {
@@ -60,14 +60,14 @@ test("ข้อความยาวเกิน 10000 ตัวอักษร�
   expect(courseSchema.safeParse({ ...valid, description: "ก".repeat(10001) }).success).toBe(false));
 
 test("ข้อความผิดพลาดเป็นภาษาไทย แยกตามช่อง", () => {
-  const r = courseSchema.safeParse({ ...valid, nameTh: "", code: "x", credits: "", categoryId: "" });
+  const r = courseSchema.safeParse({ ...valid, nameTh: "", code: "x", credits: "", placements: [{ programId: "1", categoryId: "" }] });
   expect(r.success).toBe(false);
   if (!r.success) {
     expect(fieldErrors(r.error)).toEqual({
       nameTh: "กรุณากรอกชื่อวิชา",
       code: "รหัสวิชาต้องอยู่ในรูปแบบ 00000-0000",
       credits: "ต้องเป็นจำนวนเต็ม 0–99",
-      categoryId: "กรุณาเลือกหมวดวิชา",
+      "placements.0.categoryId": "กรุณาเลือกหมวดวิชา",
     });
   }
 });
@@ -92,6 +92,40 @@ test("หมวดวิชา: ต้องมีสาขา รหัส แ�
       code: "กรุณากรอกรหัสหมวด",
       name: "กรุณากรอกชื่อหมวด",
       minCredits: "ต้องเป็นจำนวนเต็ม 0–999",
+    });
+  }
+});
+
+test("parsePlacements เรียงแถวตาม index จากคีย์ของฟอร์ม", () =>
+  expect(
+    parsePlacements({
+      "placements.1.programId": "2",
+      "placements.0.programId": "1",
+      "placements.0.categoryId": "5",
+      "placements.1.categoryId": "6",
+      nameTh: "ไม่เกี่ยว",
+    }),
+  ).toEqual([
+    { programId: "1", categoryId: "5" },
+    { programId: "2", categoryId: "6" },
+  ]));
+
+test("ไม่มีแถวตำแหน่งเลยก็ผ่าน", () => {
+  expect(parsePlacements({ nameTh: "ก" })).toEqual([]);
+  expect(courseSchema.parse({ ...valid, placements: [] }).placements).toEqual([]);
+});
+
+test("สาขา: รหัสต้องเป็นตัวเลข 5 หลัก ชื่อและประเภทวิชาห้ามว่าง", () => {
+  const ok = { code: "21901", level: "PVC", name: " เทคโนโลยีสารสนเทศ ", typeName: "อุตสาหกรรมดิจิทัล", sortOrder: "1" };
+  expect(programSchema.parse(ok)).toEqual({ ...ok, name: "เทคโนโลยีสารสนเทศ", sortOrder: 1 });
+  const r = programSchema.safeParse({ ...ok, code: "3190", level: "X", name: "", typeName: " " });
+  expect(r.success).toBe(false);
+  if (!r.success) {
+    expect(fieldErrors(r.error)).toEqual({
+      code: "รหัสสาขาต้องเป็นตัวเลข 5 หลัก",
+      level: "กรุณาเลือกระดับ",
+      name: "กรุณากรอกชื่อสาขา",
+      typeName: "กรุณากรอกประเภทวิชา",
     });
   }
 });

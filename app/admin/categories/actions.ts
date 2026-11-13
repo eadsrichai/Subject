@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { runAs, type ActionResult } from "@/lib/authz";
 import { deleteCategory, saveCategory } from "@/lib/course-admin";
+import { db } from "@/lib/db";
 
 const EDITORS = ["ADMIN", "STAFF"] as const;
 
@@ -12,7 +13,10 @@ export async function saveCategoryAction(id: number | null, formData: FormData):
   if (!result.ok) return result;
   revalidatePath("/", "layout");
   // Editing returns to the plain list; adding stays there with an empty form.
-  if (id !== null) redirect("/admin/categories");
+  if (id !== null) {
+    const category = await db.category.findUnique({ where: { id }, select: { program: { select: { code: true } } } });
+    redirect(category ? `/admin/categories?program=${category.program.code}` : "/admin/categories");
+  }
   return result;
 }
 

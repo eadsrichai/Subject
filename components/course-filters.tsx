@@ -10,10 +10,13 @@ type Props = {
   creditValues: number[];
   /** Admin list only: adds the "needs review" checkbox. */
   reviewOnly?: boolean;
+  /** Admin list only: adds a program picker (value = program code, "" = every program). */
+  programs?: { code: string; label: string }[];
+  programCode?: string;
 };
 
 /** A plain GET form: the query string is the only state, so links and reloads keep the filter. */
-export function CourseFilters({ action, filter, categories, creditValues, reviewOnly }: Props) {
+export function CourseFilters({ action, filter, categories, creditValues, reviewOnly, programs, programCode }: Props) {
   const submit = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) =>
     e.currentTarget.form?.requestSubmit();
 
@@ -26,6 +29,32 @@ export function CourseFilters({ action, filter, categories, creditValues, review
         categories ? "sm:grid-cols-[2fr_2fr_1fr_auto]" : "sm:grid-cols-[4fr_1fr_auto]"
       }`}
     >
+      {programs && (
+        <div className={categories ? "sm:col-span-4" : "sm:col-span-3"}>
+          <label htmlFor="program" className="field-label">
+            สาขา
+          </label>
+          <select
+            id="program"
+            name="program"
+            defaultValue={programCode ?? ""}
+            onChange={(e) => {
+              // A category belongs to one program: drop it when the program changes.
+              const category = e.currentTarget.form?.elements.namedItem("category");
+              if (category instanceof HTMLSelectElement) category.value = "";
+              submit(e);
+            }}
+            className="field sm:max-w-md"
+          >
+            <option value="">ทุกสาขา</option>
+            {programs.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div>
         <label htmlFor="q" className="field-label">
           ค้นหา
@@ -73,7 +102,7 @@ export function CourseFilters({ action, filter, categories, creditValues, review
         ค้นหา
       </button>
       {reviewOnly !== undefined && (
-        <label className="flex items-center gap-2 text-sm sm:col-span-4">
+        <label className={`flex items-center gap-2 text-sm ${categories ? "sm:col-span-4" : "sm:col-span-3"}`}>
           <input type="checkbox" name="review" value="1" defaultChecked={reviewOnly} onChange={submit} />
           เฉพาะที่ต้องตรวจสอบ
         </label>

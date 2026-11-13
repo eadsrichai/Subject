@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireRoleOrLogin } from "@/lib/authz";
 import { db } from "@/lib/db";
+import { levelLabel, listPrograms } from "@/lib/programs";
 
 export default async function AdminHomePage() {
   const user = await requireRoleOrLogin("ADMIN", "STAFF");
-  const [courses, categories, flagged] = await Promise.all([
+  const programs = await listPrograms();
+  const [courses, categories, flagged, flaggedPerProgram] = await Promise.all([
     db.course.count(),
     db.category.count(),
     db.course.findMany({
@@ -12,6 +14,9 @@ export default async function AdminHomePage() {
       orderBy: { code: "asc" },
       select: { id: true, code: true, nameTh: true, reviewNote: true },
     }),
+    Promise.all(
+      programs.map((p) => db.programCourse.count({ where: { programId: p.id, course: { needsReview: true } } })),
+    ),
   ]);
 
   return (
@@ -33,6 +38,40 @@ export default async function AdminHomePage() {
           </div>
         ))}
       </dl>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">แยกตามสาขา</h2>
+        <div className="card overflow-x-auto">
+          <table className="data-table" aria-label="แยกตามสาขา">
+            <thead>
+              <tr>
+                <th scope="col">สาขา</th>
+                <th scope="col">จำนวนวิชา</th>
+                <th scope="col">ต้องตรวจ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {programs.map((p, i) => (
+                <tr key={p.id}>
+                  <td>
+                    {levelLabel(p.level)} {p.name} <span className="font-mono text-slate-500">({p.code})</span>
+                  </td>
+                  <td>
+                    <Link href={`/admin/courses?program=${p.code}`} className="link">
+                      {p.courseCount}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link href={`/admin/courses?program=${p.code}&review=1`} className="link">
+                      {flaggedPerProgram[i]}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="space-y-2">
         <h2 className="font-semibold">รายวิชาที่ต้องตรวจสอบ</h2>

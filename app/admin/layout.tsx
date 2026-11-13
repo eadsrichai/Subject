@@ -19,6 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/courses" className="link">
               รายวิชา
             </Link>
+            <Link href="/admin/programs" className="link">
+              สาขา
+            </Link>
             <Link href="/admin/categories" className="link">
               หมวดวิชา
             </Link>

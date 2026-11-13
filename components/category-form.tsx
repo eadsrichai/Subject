@@ -8,13 +8,15 @@ type Props = {
   action: (formData: FormData) => Promise<ActionResult>;
   /** The program a new category is added to. */
   programId: number;
+  /** Where "ยกเลิก" returns to: the list of this program. */
+  cancelHref: string;
   /** null when adding a new category. */
   category: { code: string; name: string; minCredits: number | null; parentId: number | null; sortOrder: number } | null;
   /** Categories that may be chosen as the parent. */
   parents: { id: number; code: string; name: string; depth: number }[];
 };
 
-export function CategoryForm({ action, programId, category, parents }: Props) {
+export function CategoryForm({ action, programId, cancelHref, category, parents }: Props) {
   const { formAction, pending, errors, value, saved, attempt } = useFormAction(action);
   const editing = category !== null;
 
@@ -55,7 +57,7 @@ export function CategoryForm({ action, programId, category, parents }: Props) {
           {editing ? "บันทึก" : "เพิ่มหมวดวิชา"}
         </button>
         {editing && (
-          <Link href="/admin/categories" className="btn-secondary">
+          <Link href={cancelHref} className="btn-secondary">
             ยกเลิก
           </Link>
         )}

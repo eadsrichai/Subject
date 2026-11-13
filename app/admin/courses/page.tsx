@@ -4,26 +4,30 @@ import { CourseTable } from "@/components/course-table";
 import { Pagination } from "@/components/pagination";
 import { requireRoleOrLogin } from "@/lib/authz";
 import { filterToQuery, listCategories, listCreditValues, parseFilter, searchCourses } from "@/lib/courses";
-import { listPrograms } from "@/lib/programs";
+import { levelLabel, listPrograms } from "@/lib/programs";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function AdminCoursesPage({ searchParams }: Props) {
   await requireRoleOrLogin("ADMIN", "STAFF");
   const sp = await searchParams;
-  // Temporary until the program filter: the first program is the current one.
-  const program = (await listPrograms())[0];
+  const programs = await listPrograms();
+  // An unknown program code means "every program", like other malformed filters.
+  const program = programs.find((p) => p.code === sp.program) ?? null;
   const filter = { ...parseFilter(sp), programId: program?.id ?? null };
+  if (!program) filter.categoryId = null;
   const reviewOnly = sp.review === "1";
   const [result, categories, creditValues] = await Promise.all([
     searchCourses(filter, reviewOnly ? { needsReview: true } : {}),
-    program ? listCategories(program.id) : [],
+    program ? listCategories(program.id) : undefined,
     listCreditValues(filter.programId),
   ]);
   const pageHref = (page: number) => {
-    const query = filterToQuery({ ...filter, page });
-    if (!reviewOnly) return `/admin/courses${query}`;
-    return `/admin/courses${query ? `${query}&` : "?"}review=1`;
+    const params = new URLSearchParams(filterToQuery({ ...filter, page }).slice(1));
+    if (program) params.set("program", program.code);
+    if (reviewOnly) params.set("review", "1");
+    const query = params.toString();
+    return `/admin/courses${query ? `?${query}` : ""}`;
   };
 
   return (
@@ -40,6 +44,8 @@ export default async function AdminCoursesPage({ searchParams }: Props) {
         categories={categories}
         creditValues={creditValues}
         reviewOnly={reviewOnly}
+        programs={programs.map((p) => ({ code: p.code, label: `${levelLabel(p.level)} ${p.name} (${p.code})` }))}
+        programCode={program?.code}
       />
       <p className="text-sm text-slate-600">พบ {result.total} รายวิชา — คลิกรหัสวิชาเพื่อแก้ไข</p>
       {result.total === 0 ? (
@@ -51,7 +57,7 @@ export default async function AdminCoursesPage({ searchParams }: Props) {
         </div>
       ) : (
         <>
-          <CourseTable items={result.items} hrefFor={(c) => `/admin/courses/${c.id}`} showReviewFlag />
+          <CourseTable items={result.items} hrefFor={(c) => `/admin/courses/${c.id}`} showReviewFlag showPrograms />
           <Pagination page={result.page} pageCount={result.pageCount} hrefFor={pageHref} />
         </>
       )}

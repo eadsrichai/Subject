@@ -37,7 +37,16 @@ export const courseSchema = z.object({
   theoryHours: wholeNumber(0, 99, HOURS_MESSAGE),
   practiceHours: wholeNumber(0, 99, HOURS_MESSAGE),
   credits: wholeNumber(0, 99, HOURS_MESSAGE),
-  categoryId: wholeNumber(1, 2_000_000_000, "กรุณาเลือกหมวดวิชา"),
+  /** The course's category in each program it belongs to; one row per program (checked against the database by saveCourse). */
+  placements: z
+    .array(
+      z.object({
+        programId: wholeNumber(1, 2_000_000_000, "กรุณาเลือกสาขา"),
+        categoryId: wholeNumber(1, 2_000_000_000, "กรุณาเลือกหมวดวิชา"),
+      }),
+    )
+    .max(50, "เลือกสาขาได้ไม่เกิน 50 สาขา")
+    .default([]),
   standardRef: longText(10_000),
   learningOutcome: longText(10_000),
   objectives: longText(10_000),
@@ -58,11 +67,40 @@ export const categorySchema = z.object({
 });
 export type CategoryInput = z.infer<typeof categorySchema>;
 
-/** First message per field, keyed by field name — the shape forms display. */
+/** Form rows arrive as `placements.<i>.programId` / `placements.<i>.categoryId` keys; returns them as rows in index order. */
+export function parsePlacements(form: Record<string, unknown>): { programId: unknown; categoryId: unknown }[] {
+  const rows = new Map<number, { programId: unknown; categoryId: unknown }>();
+  for (const [key, value] of Object.entries(form)) {
+    const m = /^placements\.(\d{1,3})\.(programId|categoryId)$/.exec(key);
+    if (!m) continue;
+    const i = Number(m[1]);
+    const row = rows.get(i) ?? { programId: undefined, categoryId: undefined };
+    row[m[2] as "programId" | "categoryId"] = value;
+    rows.set(i, row);
+  }
+  return [...rows.entries()].sort(([a], [b]) => a - b).map(([, row]) => row);
+}
+
+const requiredLine = (required: string, max: number, tooLong: string) =>
+  z.preprocess((v) => thaiLine(v ?? ""), z.string().min(1, required).max(max, tooLong));
+
+export const programSchema = z.object({
+  code: z.string({ required_error: "รหัสสาขาต้องเป็นตัวเลข 5 หลัก" }).trim().regex(/^\d{5}$/, "รหัสสาขาต้องเป็นตัวเลข 5 หลัก"),
+  level: z.enum(["PVC", "PVS"], { errorMap: () => ({ message: "กรุณาเลือกระดับ" }) }),
+  name: requiredLine("กรุณากรอกชื่อสาขา", 300, "ชื่อสาขายาวเกิน 300 ตัวอักษร"),
+  typeName: requiredLine("กรุณากรอกประเภทวิชา", 300, "ชื่อประเภทวิชายาวเกิน 300 ตัวอักษร"),
+  sortOrder: z.preprocess(
+    (v) => blankToUndefined(v) ?? 0,
+    z.number({ invalid_type_error: "ต้องเป็นจำนวนเต็ม 0–9999" }).int("ต้องเป็นจำนวนเต็ม 0–9999").min(0, "ต้องเป็นจำนวนเต็ม 0–9999").max(9999, "ต้องเป็นจำนวนเต็ม 0–9999"),
+  ),
+});
+export type ProgramInput = z.infer<typeof programSchema>;
+
+/** First message per field, keyed by field name — the shape forms display. Placement rows keep their full path (`placements.0.categoryId`). */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
-    const key = String(issue.path[0] ?? "_");
+    const key = issue.path[0] === "placements" && issue.path.length > 1 ? issue.path.join(".") : String(issue.path[0] ?? "_");
     out[key] ??= issue.message;
   }
   return out;

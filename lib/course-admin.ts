@@ -14,14 +14,38 @@ const UNIQUE = "P2002";
 const NOT_FOUND = "P2025";
 const STILL_REFERENCED = "P2003";
 
+/** Per-row errors for the course form's placements, or null when every row is valid. */
+async function checkPlacements(
+  placements: { programId: number; categoryId: number }[],
+): Promise<Record<string, string> | null> {
+  const [programs, categories] = await Promise.all([
+    db.program.findMany({ where: { id: { in: placements.map((p) => p.programId) } }, select: { id: true } }),
+    db.category.findMany({
+      where: { id: { in: placements.map((p) => p.categoryId) } },
+      select: { id: true, programId: true },
+    }),
+  ]);
+  const programIds = new Set(programs.map((p) => p.id));
+  const programOfCategory = new Map(categories.map((c) => [c.id, c.programId]));
+  const errors: Record<string, string> = {};
+  const seen = new Set<number>();
+  placements.forEach((p, i) => {
+    if (seen.has(p.programId)) errors[`placements.${i}.programId`] = "เลือกสาขานี้ซ้ำ";
+    else if (!programIds.has(p.programId)) errors[`placements.${i}.programId`] = "ไม่พบสาขาที่เลือก";
+    else if (programOfCategory.get(p.categoryId) !== p.programId)
+      errors[`placements.${i}.categoryId`] = "หมวดนี้ไม่ได้อยู่ในสาขาที่เลือก";
+    seen.add(p.programId);
+  });
+  return Object.keys(errors).length > 0 ? errors : null;
+}
+
 export async function saveCourse(id: number | null, input: unknown): Promise<ActionResult> {
   const parsed = courseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
-  const { needsReview, categoryId, ...fields } = parsed.data;
+  const { needsReview, placements, ...fields } = parsed.data;
 
-  const category = await db.category.findUnique({ where: { id: categoryId }, select: { programId: true } });
-  if (!category) return fail("categoryId", "ไม่พบหมวดวิชาที่เลือก");
-  const { programId } = category;
+  const placementErrors = await checkPlacements(placements);
+  if (placementErrors) return { ok: false, errors: placementErrors };
 
   try {
     await db.$transaction(async (tx) => {
@@ -33,16 +57,22 @@ export async function saveCourse(id: number | null, input: unknown): Promise<Act
               // Clearing the flag also drops the importer's note; keeping it keeps the note.
               data: { ...fields, needsReview, ...(needsReview ? {} : { reviewNote: null }), editedAt: new Date() },
             });
-      // The chosen category decides the course's place in that category's program only.
-      await tx.programCourse.upsert({
-        where: { programId_courseId: { programId, courseId: course.id } },
-        create: { programId, courseId: course.id, categoryId },
-        update: { categoryId },
+      // The form's rows replace the course's whole set of placements; a program it stays in keeps its booklet page.
+      const previous = await tx.programCourse.findMany({
+        where: { courseId: course.id },
+        select: { programId: true, sourcePage: true },
+      });
+      const pageOf = new Map(previous.map((p) => [p.programId, p.sourcePage]));
+      await tx.programCourse.deleteMany({ where: { courseId: course.id } });
+      await tx.programCourse.createMany({
+        data: placements.map((p) => ({ ...p, courseId: course.id, sourcePage: pageOf.get(p.programId) ?? null })),
       });
     });
   } catch (err) {
     if (prismaCode(err) === UNIQUE) return fail("code", "รหัสวิชานี้มีอยู่แล้ว");
     if (prismaCode(err) === NOT_FOUND) return GONE;
+    // A chosen program or category was deleted after the check above.
+    if (prismaCode(err) === STILL_REFERENCED) return fail("_", "สาขาหรือหมวดที่เลือกถูกลบไปแล้ว กรุณาเลือกใหม่");
     throw err;
   }
   return { ok: true };

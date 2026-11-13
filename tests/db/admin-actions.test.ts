@@ -13,7 +13,7 @@ const input = (over: Record<string, unknown> = {}) => ({
   theoryHours: "1",
   practiceHours: "4",
   credits: "3",
-  categoryId: String(cat.id),
+  placements: [{ programId: String(program.id), categoryId: String(cat.id) }],
   description: "ศึกษา",
   ...over,
 });
@@ -39,13 +39,19 @@ test("สร้างรายวิชา: บันทึกค่าและ
   expect(await placementsOf("31900-0001")).toEqual([{ programId: program.id, categoryId: cat.id }]);
 });
 
-test("แก้หมวดของวิชา: แทนที่ตำแหน่งในสาขาของหมวดนั้น และไม่แตะสาขาอื่น", async () => {
+const otherProgram = async () => {
   const other = await db.program.create({ data: { code: "21901", level: "PVC", name: "อื่น", typeName: "อื่น" } });
   const otherCat = await db.category.create({ data: { code: "1", name: "หมวดสาขาอื่น", programId: other.id } });
-  await saveCourse(null, input());
-  const c = await db.course.findUniqueOrThrow({ where: { code: "31900-0001" } });
-  await db.programCourse.create({ data: { programId: other.id, courseId: c.id, categoryId: otherCat.id, sourcePage: 5 } });
-  expect(await saveCourse(c.id, input({ categoryId: String(sub.id) }))).toEqual({ ok: true });
+  return { other, otherCat };
+};
+
+const row = (programId: number, categoryId: number) => ({ programId: String(programId), categoryId: String(categoryId) });
+
+test("บันทึกวิชาพร้อมตำแหน่งสองสาขา", async () => {
+  const { other, otherCat } = await otherProgram();
+  expect(await saveCourse(null, input({ placements: [row(program.id, sub.id), row(other.id, otherCat.id)] }))).toEqual({
+    ok: true,
+  });
   expect(await placementsOf("31900-0001")).toEqual(
     expect.arrayContaining([
       { programId: program.id, categoryId: sub.id },
@@ -53,6 +59,55 @@ test("แก้หมวดของวิชา: แทนที่ตำแห
     ]),
   );
   expect(await db.programCourse.count()).toBe(2);
+});
+
+test("แก้ไขวิชา: ชุดตำแหน่งในฟอร์มแทนที่ชุดเดิมทั้งชุด", async () => {
+  const { other, otherCat } = await otherProgram();
+  await saveCourse(null, input({ placements: [row(program.id, cat.id), row(other.id, otherCat.id)] }));
+  const c = await db.course.findUniqueOrThrow({ where: { code: "31900-0001" } });
+  expect(await saveCourse(c.id, input({ placements: [row(program.id, sub.id)] }))).toEqual({ ok: true });
+  expect(await placementsOf("31900-0001")).toEqual([{ programId: program.id, categoryId: sub.id }]);
+});
+
+const snapshot = (id: number) =>
+  db.course.findUniqueOrThrow({
+    where: { id },
+    include: { placements: { orderBy: { programId: "asc" }, select: { programId: true, categoryId: true } } },
+  });
+
+test("หมวดของสาขาอื่น → error รายแถว และไม่บันทึกอะไรเลย", async () => {
+  const { otherCat } = await otherProgram();
+  await saveCourse(null, input());
+  const { id } = await db.course.findUniqueOrThrow({ where: { code: "31900-0001" } });
+  const before = await snapshot(id);
+  expect(await saveCourse(id, input({ nameTh: "เปลี่ยน", placements: [row(program.id, otherCat.id)] }))).toEqual({
+    ok: false,
+    errors: { "placements.0.categoryId": "หมวดนี้ไม่ได้อยู่ในสาขาที่เลือก" },
+  });
+  expect(await snapshot(id)).toEqual(before);
+});
+
+test("สาขาซ้ำ / สาขาไม่มีจริง / หมวดไม่มีจริง → error รายแถว และไม่สร้างวิชา", async () => {
+  expect(await saveCourse(null, input({ placements: [row(program.id, cat.id), row(program.id, sub.id)] }))).toEqual({
+    ok: false,
+    errors: { "placements.1.programId": "เลือกสาขานี้ซ้ำ" },
+  });
+  expect(await saveCourse(null, input({ placements: [row(999999, cat.id)] }))).toEqual({
+    ok: false,
+    errors: { "placements.0.programId": "ไม่พบสาขาที่เลือก" },
+  });
+  expect(await saveCourse(null, input({ placements: [row(program.id, 999999)] }))).toEqual({
+    ok: false,
+    errors: { "placements.0.categoryId": "หมวดนี้ไม่ได้อยู่ในสาขาที่เลือก" },
+  });
+  expect(await db.course.count()).toBe(0);
+});
+
+test("ไม่มีตำแหน่งเลยก็บันทึกได้", async () => {
+  await saveCourse(null, input());
+  const c = await db.course.findUniqueOrThrow({ where: { code: "31900-0001" } });
+  expect(await saveCourse(c.id, input({ placements: [] }))).toEqual({ ok: true });
+  expect(await db.programCourse.count()).toBe(0);
 });
 
 test("แก้ไข: ล้าง needsReview และ reviewNote เมื่อไม่ได้ติ๊ก, คงไว้เมื่อติ๊ก", async () => {
@@ -95,9 +150,6 @@ test("แก้วิชาโดยคงรหัสเดิมไม่ถ�
   expect(await saveCourse(first.id, input({ nameTh: "ชื่อใหม่" }))).toEqual({ ok: true });
   expect(await saveCourse(first.id, input({ code: "31900-0002" }))).toEqual({ ok: false, errors: { code: "รหัสวิชานี้มีอยู่แล้ว" } });
 });
-
-test("categoryId ที่ไม่มีจริง → errors.categoryId", async () =>
-  expect(await saveCourse(null, input({ categoryId: "999999" }))).toEqual({ ok: false, errors: { categoryId: "ไม่พบหมวดวิชาที่เลือก" } }));
 
 test("แก้/ลบรายวิชาที่ไม่มีแล้ว → errors._", async () => {
   const gone = { ok: false, errors: { _: "ไม่พบข้อมูล อาจถูกลบไปแล้ว" } };
@@ -165,7 +217,7 @@ test("ตั้งหมวดแม่เป็นตัวเอง ลูก�
 test("ลบหมวดที่มีหมวดย่อยหรือรายวิชาไม่ได้ ลบหมวดว่างได้", async () => {
   const blocked = { ok: false, errors: { _: "ลบไม่ได้: ยังมีรายวิชาหรือหมวดย่อยอยู่" } };
   expect(await deleteCategory(cat.id)).toEqual(blocked);
-  await saveCourse(null, input({ categoryId: String(sub.id) }));
+  await saveCourse(null, input({ placements: [row(program.id, sub.id)] }));
   expect(await deleteCategory(sub.id)).toEqual(blocked);
   expect(await db.category.count()).toBe(2);
 

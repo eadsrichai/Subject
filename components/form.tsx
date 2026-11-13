@@ -34,6 +34,8 @@ export function useFormAction(action: (formData: FormData) => Promise<ActionResu
       state.values ? (state.values[name] ?? "") : String(stored ?? ""),
     /** Same for a checkbox. */
     checked: (name: string, stored: boolean) => (state.values ? name in state.values : stored),
+    /** Everything submitted in the last failed attempt (passwords excepted), or null. */
+    submitted: state.values,
     /** Changes whenever a submission fails, to remount fields with the submitted values. */
     attempt: state.values ? JSON.stringify(state.values) : "initial",
   };
