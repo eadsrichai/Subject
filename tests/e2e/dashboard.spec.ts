@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("แดชบอร์ดแสดงตัวเลขตรงกับข้อมูล", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/p/31901/dashboard");
   await expect(page.getByTestId("total-courses")).toHaveText("45");
 
   const structure = page.getByRole("table", { name: "โครงสร้างหลักสูตร" });

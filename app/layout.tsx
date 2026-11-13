@@ -9,9 +9,9 @@ const sarabun = Sarabun({
 });
 
 export const metadata: Metadata = {
-  title: "ฐานข้อมูลรายวิชา ปวส. 2567 สาขาเทคโนโลยีสารสนเทศ",
+  title: "ฐานข้อมูลรายวิชา หลักสูตร 2567",
   description:
-    "ค้นหารายวิชาตามหลักสูตรประกาศนียบัตรวิชาชีพชั้นสูง พุทธศักราช 2567 สาขาวิชาเทคโนโลยีสารสนเทศ",
+    "ค้นหารายวิชาตามหลักสูตรประกาศนียบัตรวิชาชีพ (ปวช.) และประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.) พุทธศักราช 2567",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

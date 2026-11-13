@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProgramBadge } from "@/components/program-badge";
 import type { CourseListItem } from "@/lib/courses";
 
 type Props = {
@@ -6,9 +7,11 @@ type Props = {
   /** Where a course code links to; omit for a plain (printable) table. */
   hrefFor?: (item: CourseListItem) => string;
   showReviewFlag?: boolean;
+  /** Cross-program list: show each course's programs instead of its category in one program. */
+  showPrograms?: boolean;
 };
 
-export function CourseTable({ items, hrefFor, showReviewFlag }: Props) {
+export function CourseTable({ items, hrefFor, showReviewFlag, showPrograms }: Props) {
   return (
     <div className="card overflow-x-auto">
       <table className="data-table">
@@ -21,7 +24,7 @@ export function CourseTable({ items, hrefFor, showReviewFlag }: Props) {
             <th scope="col" className="whitespace-nowrap">
               ท-ป-น
             </th>
-            <th scope="col">หมวด/กลุ่มวิชา</th>
+            <th scope="col">{showPrograms ? "หลักสูตร" : "หมวด/กลุ่มวิชา"}</th>
           </tr>
         </thead>
         <tbody>
@@ -50,7 +53,21 @@ export function CourseTable({ items, hrefFor, showReviewFlag }: Props) {
               <td className="whitespace-nowrap font-mono">
                 {c.theoryHours}-{c.practiceHours}-{c.credits}
               </td>
-              <td className="text-slate-600">{c.categoryName}</td>
+              {showPrograms ? (
+                <td>
+                  {c.programs.length === 0 ? (
+                    <span className="text-slate-500">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {c.programs.map((p) => (
+                        <ProgramBadge key={p.code} program={p} />
+                      ))}
+                    </div>
+                  )}
+                </td>
+              ) : (
+                <td className="text-slate-600">{c.categoryName}</td>
+              )}
             </tr>
           ))}
         </tbody>

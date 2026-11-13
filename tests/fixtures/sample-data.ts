@@ -52,3 +52,15 @@ export const sampleData: Extracted = {
     ),
   ],
 };
+
+/** Program 21901 (ปวช.): shares 30000-1101 with 31901 and has one course of its own. */
+export const sampleDataPvc: Extracted = {
+  categories: [
+    { code: "1", name: "หมวดวิชาสมรรถนะแกนกลาง", minCredits: 22, parentCode: null, sortOrder: 0 },
+    { code: "2", name: "หมวดวิชาสมรรถนะวิชาชีพ", minCredits: 56, parentCode: null, sortOrder: 1 },
+  ],
+  courses: [
+    { ...sampleData.courses[0], categoryCode: "1" },
+    base("21900-1001", "คอมพิวเตอร์และสารสนเทศเพื่องานอาชีพ", "Computer and Information for Careers", "2"),
+  ],
+};

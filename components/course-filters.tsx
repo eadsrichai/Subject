@@ -5,7 +5,8 @@ import type { CourseFilter } from "@/lib/course-filter";
 type Props = {
   action: string;
   filter: CourseFilter;
-  categories: { id: number; code: string; name: string; depth: number; courseCount: number }[];
+  /** Omit for a cross-program list, which has no category filter. */
+  categories?: { id: number; code: string; name: string; depth: number; courseCount: number }[];
   creditValues: number[];
   /** Admin list only: adds the "needs review" checkbox. */
   reviewOnly?: boolean;
@@ -17,7 +18,14 @@ export function CourseFilters({ action, filter, categories, creditValues, review
     e.currentTarget.form?.requestSubmit();
 
   return (
-    <form method="get" action={action} role="search" className="card grid gap-3 p-4 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
+    <form
+      method="get"
+      action={action}
+      role="search"
+      className={`card grid gap-3 p-4 sm:items-end ${
+        categories ? "sm:grid-cols-[2fr_2fr_1fr_auto]" : "sm:grid-cols-[4fr_1fr_auto]"
+      }`}
+    >
       <div>
         <label htmlFor="q" className="field-label">
           ค้นหา
@@ -32,6 +40,7 @@ export function CourseFilters({ action, filter, categories, creditValues, review
           className="field"
         />
       </div>
+      {categories && (
       <div>
         <label htmlFor="category" className="field-label">
           หมวดวิชา
@@ -46,6 +55,7 @@ export function CourseFilters({ action, filter, categories, creditValues, review
           ))}
         </select>
       </div>
+      )}
       <div>
         <label htmlFor="credits" className="field-label">
           หน่วยกิต

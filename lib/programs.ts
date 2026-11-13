@@ -39,3 +39,7 @@ export async function getProgramByCode(code: string): Promise<ProgramSummary | n
   const row = await db.program.findUnique({ where: { code }, select: summarySelect });
   return row && toSummary(row);
 }
+
+export function levelLabel(level: Level): "ปวช." | "ปวส." {
+  return level === "PVC" ? "ปวช." : "ปวส.";
+}

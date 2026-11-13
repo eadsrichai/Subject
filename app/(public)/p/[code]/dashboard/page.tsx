@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { CategoryBarChart, CreditsBarChart, HoursBarChart } from "@/components/charts";
 import { getStats } from "@/lib/courses";
-import { listPrograms } from "@/lib/programs";
+import { programFromParams, programTitle } from "../program";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "สรุปภาพรวมรายวิชา" };
 
-/** Total credits the curriculum requires (spec §2: "รวมไม่น้อยกว่า 80 หน่วยกิต"). */
-const REQUIRED_CREDITS = 80;
+type Props = { params: Promise<{ code: string }> };
 
-export default async function DashboardPage() {
-  // Temporary until the per-program pages: the first program is the current one.
-  const program = (await listPrograms())[0];
-  if (!program) notFound();
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return { title: `สรุปภาพรวม — ${programTitle(await programFromParams((await params).code))}` };
+}
+
+export default async function DashboardPage({ params }: Props) {
+  const program = await programFromParams((await params).code);
   const stats = await getStats(program.id);
   const topLevel = stats.byCategory.filter((c) => c.depth === 0);
+  // The structure's total: the minimum credits of the numbered top-level categories
+  // (non-numbered ones, such as PRE foundation courses, are not counted toward graduation).
+  const counted = topLevel.filter((c) => /^\d+$/.test(c.code) && c.minCredits !== null);
+  const requiredCredits = counted.reduce((sum, c) => sum + c.minCredits!, 0);
   const totalHours = stats.hours.theory + stats.hours.practice;
   const percent = (n: number) => (totalHours === 0 ? "0" : ((n / totalHours) * 100).toFixed(0));
 
@@ -33,7 +36,7 @@ export default async function DashboardPage() {
         <div className="card p-4">
           <dt className="text-sm text-slate-600">หน่วยกิตที่ต้องเรียนตามโครงสร้าง</dt>
           <dd className="text-3xl font-semibold">
-            ≥ {REQUIRED_CREDITS}
+            {counted.length > 0 ? `≥ ${requiredCredits}` : "—"}
           </dd>
         </div>
         <div className="card p-4">

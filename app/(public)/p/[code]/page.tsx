@@ -1,19 +1,20 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { CourseFilters } from "@/components/course-filters";
 import { CourseTable } from "@/components/course-table";
 import { Pagination } from "@/components/pagination";
 import { filterToQuery, listCategories, listCreditValues, parseFilter, searchCourses } from "@/lib/courses";
-import { listPrograms } from "@/lib/programs";
+import { programFromParams } from "./program";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+type Props = {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function CourseListPage({ searchParams }: Props) {
-  // Temporary until the per-program pages: the first program is the current one.
-  const program = (await listPrograms())[0];
-  if (!program) notFound();
+export default async function ProgramCoursesPage({ params, searchParams }: Props) {
+  const program = await programFromParams((await params).code);
+  const base = `/p/${program.code}`;
   const filter = { ...parseFilter(await searchParams), programId: program.id };
   const [result, categories, creditValues] = await Promise.all([
     searchCourses(filter),
@@ -21,20 +22,21 @@ export default async function CourseListPage({ searchParams }: Props) {
     listCreditValues(program.id),
   ]);
   const query = filterToQuery({ ...filter, page: 1 });
+  const exportQuery = query ? `?program=${program.code}&${query.slice(1)}` : `?program=${program.code}`;
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">รายวิชา</h1>
-      <CourseFilters action="/" filter={filter} categories={categories} creditValues={creditValues} />
+      <CourseFilters action={base} filter={filter} categories={categories} creditValues={creditValues} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-600">พบ {result.total} รายวิชา</p>
         {result.total > 0 && (
           <div className="flex gap-2">
-            <a href={`/api/export${query}`} className="btn-secondary">
+            <a href={`/api/export${exportQuery}`} className="btn-secondary">
               ส่งออก Excel
             </a>
-            <Link href={`/print${query}`} className="btn-secondary">
+            <Link href={`${base}/print${query}`} className="btn-secondary">
               พิมพ์ / บันทึก PDF
             </Link>
           </div>
@@ -44,17 +46,20 @@ export default async function CourseListPage({ searchParams }: Props) {
       {result.total === 0 ? (
         <div className="card p-10 text-center">
           <p className="text-slate-700">ไม่พบรายวิชาที่ตรงกับเงื่อนไข</p>
-          <Link href="/" className="btn-secondary mt-4">
+          <Link href={base} className="btn-secondary mt-4">
             ล้างตัวกรอง
           </Link>
         </div>
       ) : (
         <>
-          <CourseTable items={result.items} hrefFor={(c) => `/courses/${encodeURIComponent(c.code)}`} />
+          <CourseTable
+            items={result.items}
+            hrefFor={(c) => `/courses/${encodeURIComponent(c.code)}?from=${program.code}`}
+          />
           <Pagination
             page={result.page}
             pageCount={result.pageCount}
-            hrefFor={(page) => `/${filterToQuery({ ...filter, page })}`}
+            hrefFor={(page) => `${base}${filterToQuery({ ...filter, page })}`}
           />
         </>
       )}

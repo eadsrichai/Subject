@@ -1,12 +1,12 @@
 import { execSync } from "node:child_process";
 import bcrypt from "bcryptjs";
 import { loadRegistry } from "../../lib/program-registry";
-import { sampleData } from "../fixtures/sample-data";
+import { sampleData, sampleDataPvc } from "../fixtures/sample-data";
 import { testDatabaseUrl } from "../test-env";
 
 export const TEST_PASSWORD = "password-1234";
 
-const PROGRAM_31901 = loadRegistry().find((p) => p.code === "31901")!;
+const program = (code: string) => loadRegistry().find((p) => p.code === code)!;
 
 export default async function globalSetup() {
   const url = testDatabaseUrl();
@@ -20,7 +20,12 @@ export default async function globalSetup() {
     await db.$executeRawUnsafe(
       'TRUNCATE "ProgramCourse", "Course", "Category", "Program", "User" RESTART IDENTITY CASCADE',
     );
-    await seedFromExtracted(db, PROGRAM_31901, sampleData);
+    await seedFromExtracted(db, program("31901"), sampleData, { sortOrder: 0 });
+    await seedFromExtracted(db, program("21901"), sampleDataPvc, { sortOrder: 1 });
+    // A course placed in no program: found by the cross-program search only.
+    await db.course.create({
+      data: { code: "99999-0001", nameTh: "วิชาไร้สาขา", nameEn: "", theoryHours: 1, practiceHours: 0, credits: 1 },
+    });
     await ensureAdmin(db, "admin@test.local", TEST_PASSWORD);
     await db.user.create({
       data: {
