@@ -14,6 +14,15 @@ const pvs: ProgramEntry = {
   pages: [37, 106],
 };
 
+const pvc: ProgramEntry = {
+  code: "21901",
+  level: "PVC",
+  name: "เทคโนโลยีสารสนเทศ",
+  typeName: "อุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ",
+  pdf: "ปวช-เทคโนโลยีสารสนเทศ-21901.pdf",
+  pages: [14, 81],
+};
+
 const course = (code: string, categoryCode: string | null): ExtractedCourse => ({
   code,
   nameTh: `วิชา ${code}`,
@@ -40,6 +49,15 @@ const data: Extracted = {
   courses: [course("30000-1101", "1.1"), course("X-0001", null)],
 };
 
+const withCourse = (fields: Partial<ExtractedCourse> & { code: string }): Extracted => ({
+  ...data,
+  courses: [{ ...course(fields.code, "1.1"), ...fields }],
+});
+
+const summary = (counts: Partial<Record<"created" | "updated" | "shared" | "filled" | "conflicts" | "skipped", number>>) => ({
+  created: 0, updated: 0, shared: 0, filled: 0, conflicts: 0, skipped: 0, ...counts,
+});
+
 const category = async (code: string) => {
   const program = await db.program.findUniqueOrThrow({ where: { code: pvs.code } });
   return db.category.findUniqueOrThrow({
@@ -52,7 +70,7 @@ const placement = (code: string) =>
   db.programCourse.findFirstOrThrow({ where: { course: { code } }, include: { category: true, program: true } });
 
 test("สร้างสาขา หมวดเป็นต้นไม้ และรายวิชา; วิชาไม่มีหมวดไปอยู่หมวด 'ยังไม่จัดหมวด' (รหัส NONE) และ needsReview", async () => {
-  expect(await seedFromExtracted(db, pvs, data)).toEqual({ created: 2, updated: 0, skipped: 0 });
+  expect(await seedFromExtracted(db, pvs, data)).toEqual(summary({ created: 2 }));
   expect(await db.program.findMany()).toMatchObject([
     { code: "31901", level: "PVS", name: "เทคโนโลยีสารสนเทศ", typeName: "อุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ" },
   ]);
@@ -76,22 +94,119 @@ test("เหตุผลที่ต้องตรวจสอบถูกเ�
 
 test("รันซ้ำไม่เพิ่มแถว", async () => {
   await seedFromExtracted(db, pvs, data);
-  expect(await seedFromExtracted(db, pvs, data)).toEqual({ created: 0, updated: 2, skipped: 0 });
+  expect(await seedFromExtracted(db, pvs, data)).toEqual(summary({ updated: 2 }));
   expect(await db.program.count()).toBe(1);
   expect(await db.course.count()).toBe(2);
   expect(await db.category.count()).toBe(3);
   expect(await db.programCourse.count()).toBe(2);
 });
 
-test("ไม่ทับวิชาที่แก้ผ่านเว็บ เว้นแต่ force", async () => {
+test("วิชาใหม่: เจ้าของคือสาขาที่นำเข้า", async () => {
   await seedFromExtracted(db, pvs, data);
+  expect((await db.course.findUniqueOrThrow({ where: { code: "30000-1101" } })).sourceProgramCode).toBe("31901");
+});
+
+test("สาขาอื่นเติมได้เฉพาะช่องว่าง เนื้อหาต่างได้ธงพร้อมหมายเหตุ", async () => {
+  await seedFromExtracted(db, pvs, withCourse({ code: "X-1", description: null, objectives: "ก" }));
+  const r = await seedFromExtracted(db, pvc, withCourse({ code: "X-1", description: "คำอธิบาย", objectives: "ข" }));
+  expect(r).toMatchObject({ created: 0, shared: 1, filled: 1, conflicts: 1 });
+  expect(await db.course.findUniqueOrThrow({ where: { code: "X-1" } })).toMatchObject({
+    description: "คำอธิบาย",
+    objectives: "ก",
+    sourceProgramCode: "31901",
+    needsReview: true,
+    reviewNote: expect.stringContaining("เนื้อหาต่างจากหลักสูตร 21901: objectives"),
+  });
+});
+
+test("วิชาที่สร้างผ่านเว็บ (เจ้าของ null) ถือเป็นสาขาอื่น ไม่ถูกทับแม้ใช้ force", async () => {
+  await seedFromExtracted(db, pvs, withCourse({ code: "X-1", nameTh: "ชื่อเดิม" }));
+  await db.course.update({ where: { code: "X-1" }, data: { sourceProgramCode: null, editedAt: new Date() } });
+  const r = await seedFromExtracted(db, pvs, withCourse({ code: "X-1", nameTh: "ชื่ออื่น" }), { force: true });
+  expect(r).toEqual(summary({ shared: 1, conflicts: 1 }));
+  expect(await db.course.findUniqueOrThrow({ where: { code: "X-1" } })).toMatchObject({
+    nameTh: "ชื่อเดิม",
+    sourceProgramCode: null,
+    reviewNote: "เนื้อหาต่างจากหลักสูตร 31901: nameTh",
+  });
+});
+
+test("ช่องว่างต่างกันไม่ถือว่าเนื้อหาต่าง", async () => {
+  await seedFromExtracted(db, pvs, withCourse({ code: "X-1", objectives: "ก  ข\n" }));
+  const r = await seedFromExtracted(db, pvc, withCourse({ code: "X-1", objectives: " ก ข" }));
+  expect(r).toEqual(summary({ shared: 1 }));
+  expect(await db.course.findUniqueOrThrow({ where: { code: "X-1" } })).toMatchObject({
+    objectives: "ก  ข\n",
+    needsReview: false,
+    reviewNote: null,
+  });
+});
+
+test("seed ซ้ำสองรอบไม่ต่อหมายเหตุซ้ำ", async () => {
+  const owner = withCourse({ code: "X-1", objectives: "ก", reviewReasons: ["เหตุผลจากเล่ม"] });
+  const other = withCourse({ code: "X-1", objectives: "ข", competencies: "อื่น" });
+  await seedFromExtracted(db, pvs, owner);
+  await seedFromExtracted(db, pvc, other);
+  const placements = await db.programCourse.count();
+  await seedFromExtracted(db, pvs, owner);
+  expect(await seedFromExtracted(db, pvc, other)).toEqual(summary({ shared: 1, conflicts: 1 }));
+  const row = await db.course.findUniqueOrThrow({ where: { code: "X-1" } });
+  expect(row.reviewNote).toBe("เหตุผลจากเล่ม; เนื้อหาต่างจากหลักสูตร 21901: objectives, competencies");
+  expect(row.reviewNote!.split("เนื้อหาต่างจากหลักสูตร 21901")).toHaveLength(2);
+  expect(await db.programCourse.count()).toBe(placements);
+});
+
+test("หมายเหตุของสาขาเดิมถูกแทนด้วยรายการช่องล่าสุด", async () => {
+  await seedFromExtracted(db, pvs, withCourse({ code: "X-1", objectives: "ก", competencies: "ค" }));
+  await seedFromExtracted(db, pvc, withCourse({ code: "X-1", objectives: "ข", competencies: "ค" }));
+  await seedFromExtracted(db, pvc, withCourse({ code: "X-1", objectives: "ข", competencies: "ง" }));
+  expect((await db.course.findUniqueOrThrow({ where: { code: "X-1" } })).reviewNote).toBe(
+    "เนื้อหาต่างจากหลักสูตร 21901: objectives, competencies",
+  );
+});
+
+test("เจ้าของอัปเดตเนื้อหาได้ แต่ไม่ทับวิชาที่แก้ผ่านเว็บ เว้นแต่ force", async () => {
+  await seedFromExtracted(db, pvs, data);
+  await db.course.update({ where: { code: "X-0001" }, data: { nameTh: "ชื่อเก่า" } });
   await db.course.update({ where: { code: "30000-1101" }, data: { nameTh: "แก้แล้ว", editedAt: new Date() } });
-  expect(await seedFromExtracted(db, pvs, data)).toEqual({ created: 0, updated: 1, skipped: 1 });
+  expect(await seedFromExtracted(db, pvs, data)).toEqual(summary({ updated: 1, skipped: 1 }));
+  expect((await db.course.findUniqueOrThrow({ where: { code: "X-0001" } })).nameTh).toBe("วิชา X-0001");
   expect((await db.course.findUniqueOrThrow({ where: { code: "30000-1101" } })).nameTh).toBe("แก้แล้ว");
   await seedFromExtracted(db, pvs, data, { force: true });
   const forced = await db.course.findUniqueOrThrow({ where: { code: "30000-1101" } });
-  expect(forced.nameTh).toBe("วิชา 30000-1101");
-  expect(forced.editedAt).toBeNull();
+  expect(forced).toMatchObject({ nameTh: "วิชา 30000-1101", editedAt: null, sourceProgramCode: "31901" });
+});
+
+test("ลำดับสาขามาจากลำดับในไฟล์ทะเบียน ตั้งตอนสร้าง (หรือ force) เท่านั้น", async () => {
+  await seedFromExtracted(db, pvs, data, { sortOrder: 0 });
+  await seedFromExtracted(db, pvc, data, { sortOrder: 1 });
+  const order = async () => (await db.program.findMany({ orderBy: { code: "asc" } })).map((p) => [p.code, p.sortOrder]);
+  expect(await order()).toEqual([["21901", 1], ["31901", 0]]);
+  await db.program.update({ where: { code: "21901" }, data: { sortOrder: 5 } });
+  await seedFromExtracted(db, pvc, data, { sortOrder: 1 });
+  expect(await order()).toEqual([["21901", 5], ["31901", 0]]);
+  await seedFromExtracted(db, pvc, data, { sortOrder: 1, force: true });
+  expect(await order()).toEqual([["21901", 1], ["31901", 0]]);
+});
+
+test("วิชาเจ้าของ null ที่ไม่เคยแก้ผ่านเว็บ (seed ก่อน migration) สาขาที่นำเข้ารับเป็นเจ้าของ", async () => {
+  await seedFromExtracted(db, pvs, withCourse({ code: "X-1", nameTh: "ชื่อเดิม" }));
+  await db.course.update({ where: { code: "X-1" }, data: { sourceProgramCode: null } });
+  const r = await seedFromExtracted(db, pvs, withCourse({ code: "X-1", nameTh: "ชื่อใหม่" }));
+  expect(r).toEqual(summary({ updated: 1 }));
+  expect(await db.course.findUniqueOrThrow({ where: { code: "X-1" } })).toMatchObject({
+    nameTh: "ชื่อใหม่",
+    sourceProgramCode: "31901",
+    needsReview: false,
+  });
+});
+
+test("วิชาเดียวอยู่สองสาขา", async () => {
+  await seedFromExtracted(db, pvs, data);
+  expect(await seedFromExtracted(db, pvc, data)).toEqual(summary({ shared: 2 }));
+  expect(await db.programCourse.count({ where: { course: { code: "30000-1101" } } })).toBe(2);
+  expect((await db.course.findUniqueOrThrow({ where: { code: "30000-1101" } })).sourceProgramCode).toBe("31901");
+  expect(await db.program.count()).toBe(2);
 });
 
 test("ไม่ทับหมวดที่แก้ผ่านเว็บ เว้นแต่ force", async () => {
@@ -107,7 +222,7 @@ test("ไม่ทับหมวดที่แก้ผ่านเว็บ �
   expect(await category("1.1")).toMatchObject({ name: "กลุ่ม", minCredits: 6, parentId: top.id });
 });
 
-test("ไม่ทับตำแหน่งที่ย้ายผ่านเว็บ เว้นแต่ force", async () => {
+test("ไม่ทับตำแหน่งที่ย้ายผ่านเว็บ และไม่ทับชื่อสาขาที่แก้ เว้นแต่ force", async () => {
   await seedFromExtracted(db, pvs, data);
   const top = await category("1");
   const moved = await placement("30000-1101");
@@ -115,18 +230,12 @@ test("ไม่ทับตำแหน่งที่ย้ายผ่าน�
     where: { programId_courseId: { programId: moved.programId, courseId: moved.courseId } },
     data: { categoryId: top.id },
   });
-  await seedFromExtracted(db, pvs, data);
-  expect((await placement("30000-1101")).category.code).toBe("1");
-  await seedFromExtracted(db, pvs, data, { force: true });
-  expect((await placement("30000-1101")).category.code).toBe("1.1");
-});
-
-test("ไม่ทับสาขาที่แก้ผ่านเว็บ เว้นแต่ force", async () => {
-  await seedFromExtracted(db, pvs, data);
   await db.program.update({ where: { code: "31901" }, data: { name: "ชื่อใหม่" } });
   await seedFromExtracted(db, pvs, data);
+  expect((await placement("30000-1101")).category.code).toBe("1");
   expect((await db.program.findUniqueOrThrow({ where: { code: "31901" } })).name).toBe("ชื่อใหม่");
   await seedFromExtracted(db, pvs, data, { force: true });
+  expect((await placement("30000-1101")).category.code).toBe("1.1");
   expect((await db.program.findUniqueOrThrow({ where: { code: "31901" } })).name).toBe("เทคโนโลยีสารสนเทศ");
 });
 
