@@ -11,8 +11,6 @@ export default async function ProgramListPage() {
 
   return (
     <div className="space-y-6">
-      {/* ทดสอบการ deploy: พื้นหลังสีแดงเฉพาะหน้าแรก */}
-      <div aria-hidden className="fixed inset-0 -z-10 bg-red-600" />
       <h1 className="text-xl font-semibold">หลักสูตร</h1>
 
       <form method="get" action="/search" role="search" className="card flex flex-wrap items-end gap-3 p-4">
