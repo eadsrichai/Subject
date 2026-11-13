@@ -38,7 +38,11 @@ npm run dev                   # http://localhost:3000
 
 ## รันแบบ container
 
-ทุกครั้งที่ push เข้า `main` GitHub Actions จะ build image แล้วส่งขึ้น `ghcr.io/eadsrichai/subject:latest` (ดู `.github/workflows/container.yml`)
+ทุกครั้งที่ push เข้า `main` GitHub Actions (`.github/workflows/ci-cd.yml`) จะ
+
+1. **test:** รัน tsc, lint, unit และ db test (pull request ก็รันขั้นนี้ด้วย)
+2. **image:** ถ้า test ผ่าน จะ build แล้วส่งขึ้น `ghcr.io/eadsrichai/subject:latest`
+3. **deploy:** ถ้าตั้งค่า server ไว้ (ดูหัวข้อถัดไป) จะ SSH เข้า server แล้วอัปเดตเว็บให้เอง
 
 ```bash
 docker compose --profile app pull                          # ดึง image ล่าสุด (หรือ build เองด้วย --profile app build)
@@ -49,6 +53,31 @@ docker compose --profile app run --rm app npx prisma db seed   # นำเข้
 - container จะรัน `prisma migrate deploy` ทุกครั้งก่อนเปิดเว็บ
 - ค่า `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` อ่านจาก `.env`
 - image ใน ghcr.io เป็น private ตั้งแต่แรก ถ้าจะให้คนอื่นดึงได้ ต้องเปลี่ยนเป็น public ที่ Package settings บน GitHub
+- ห้ามรัน `docker compose down -v` บน server เพราะจะลบฐานข้อมูลทั้งหมด
+
+### ตั้งค่า deploy อัตโนมัติ (ทำครั้งเดียว)
+
+บน server: ติดตั้งตามขั้นตอนข้างบนให้เว็บเปิดได้ก่อน (clone repo, `.env`, `docker login ghcr.io` ถ้า image ยังเป็น private) แล้วสร้าง SSH key สำหรับ GitHub โดยเฉพาะ
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/github-deploy -N ""
+cat ~/.ssh/github-deploy.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/github-deploy        # คัดลอกทั้งหมด ไปใส่ secret ข้างล่าง
+```
+
+ผู้ใช้นี้ต้องรัน `docker` ได้โดยไม่ต้อง sudo (`sudo usermod -aG docker $USER` แล้วล็อกอินใหม่)
+
+บน GitHub: repo → Settings → Secrets and variables → Actions
+
+| ประเภท | ชื่อ | ค่า |
+|---|---|---|
+| Secret | `DEPLOY_SSH_KEY` | private key จาก `~/.ssh/github-deploy` |
+| Variable | `DEPLOY_HOST` | IP หรือโดเมนของ server |
+| Variable | `DEPLOY_USER` | ชื่อผู้ใช้บน server |
+| Variable | `DEPLOY_PATH` | โฟลเดอร์ที่ clone ไว้ (ไม่ใส่ = `Subject` ใน home) |
+| Variable | `DEPLOY_PORT` | พอร์ต SSH (ไม่ใส่ = 22) |
+
+ถ้ายังไม่ได้ตั้ง `DEPLOY_HOST` ขั้น deploy จะถูกข้ามไป ส่วน test และ image ทำงานตามปกติ
 
 ## บัญชีผู้ใช้
 
