@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Line } from "@/scripts/pdf/lines";
 import { parseCategoryHeading, parseCourseRow, parseDocument } from "@/scripts/pdf/parse";
 import { fixtureLines, line as pageLine } from "../fixtures/pdf-lines";
+import { pvcLines } from "../fixtures/pdf-lines-pvc";
 
 const line = (...cells: [number, string][]): Line => pageLine(1, ...cells);
 
@@ -210,5 +211,27 @@ describe("parseDocument", () => {
       needsReview: true,
     });
     expect(r.courses[1].reviewReasons[0]).toBe("ไม่พบในตารางโครงสร้าง");
+  });
+});
+
+describe("เล่ม ปวช.", () => {
+  const data = parseDocument(pvcLines);
+  test("หมวดเลขมีจุด ไม่มี PRE", () =>
+    expect(data.categories.map((c) => c.code)).toEqual(["1", "1.1", "2", "2.1", "4"]));
+  test("รหัสถูกหั่นที่ x ห่างกัน", () =>
+    expect(data.courses.find((c) => c.code === "20000-2003")).toMatchObject({ nameTh: "กิจกรรมเสริมสร้างสุจริต จิตอาสา", credits: 0, categoryCode: "4" }));
+  test("ข้อความแม่แบบ (เว้นระยะอักษร …) ไม่ปนในเนื้อหา", () => {
+    const c = data.courses.find((c) => c.code === "21900-1001")!;
+    for (const v of [c.standardRef, c.learningOutcome, c.objectives, c.competencies, c.description])
+      expect(v).not.toMatch(/เว้นระยะ/);
+    expect(c.reviewReasons).toEqual([]);
+  });
+  test("หมวดแกนกลางที่คำอธิบายอยู่นอกเล่ม ไม่ติดธง", () =>
+    expect(data.courses.find((c) => c.code === "20000-1101")).toMatchObject({ description: null, needsReview: false }));
+  test("ข้อความแม่แบบท้ายบรรทัดเนื้อหา และ (ให้เขียนเพียง 4 ข้อเท่านั้น) ถูกตัดออก", () => {
+    expect(data.courses.find((c) => c.code === "21900-1002")).toMatchObject({ standardRef: "-", reviewReasons: [] });
+    expect(data.courses.find((c) => c.code === "21900-1001")!.objectives).toBe(
+      "1. รู้และเข้าใจหลักการเขียนโปรแกรมคอมพิวเตอร์",
+    );
   });
 });

@@ -114,7 +114,19 @@ function appendText(existing: string | undefined, text: string): string {
 const isEnglishName = (line: Line | undefined) =>
   !!line && /^[\x20-\x7E]+$/.test(line.text) && /[A-Za-z]/.test(line.text);
 
-export function parseDocument(lines: Line[]): Extracted {
+// Instructions left over from the booklet's template, on lines of their own or after content.
+const TEMPLATE_NOTE = /\(\s*(เว้นระยะอักษร\s*\d*|ให้เขียนเพียง\s*\d+\s*ข้อเท่านั้น)\s*\)/g;
+
+function dropTemplateNotes(lines: Line[]): Line[] {
+  return lines.flatMap((l) => {
+    const text = l.text.replace(TEMPLATE_NOTE, "").trim();
+    if (text === l.text) return [l];
+    return text ? [{ ...l, text }] : [];
+  });
+}
+
+export function parseDocument(input: Line[]): Extracted {
+  const lines = dropTemplateNotes(input);
   const rows = lines.map(parseCourseRow);
   const folded = lines.map((l) => foldThai(l.text));
   const standardRef = SECTIONS[0].folded;
