@@ -43,7 +43,7 @@ test("ข้อความที่วางจาก PDF ถูกแก้อ
   }));
 
 test("ชื่อหมวดที่วางจาก PDF ถูกแก้อักขระไทย", () =>
-  expect(categorySchema.parse({ code: "9", name: "กลุมใหม" }).name).toBe("กลุ่มใหม่"));
+  expect(categorySchema.parse({ programId: "1", code: "9", name: "กลุมใหม" }).name).toBe("กลุ่มใหม่"));
 
 test("ค่าจากฟอร์ม (สตริง) ถูกแปลงเป็นตัวเลขและ boolean", () =>
   expect(
@@ -73,7 +73,8 @@ test("ข้อความผิดพลาดเป็นภาษาไท�
 });
 
 test("หมวดวิชา: ค่าว่างของหน่วยกิตขั้นต่ำและหมวดแม่เป็น null", () =>
-  expect(categorySchema.parse({ code: " 2.3 ", name: " กลุ่มใหม่ ", minCredits: "", parentId: "", sortOrder: "4" })).toEqual({
+  expect(categorySchema.parse({ programId: "1", code: " 2.3 ", name: " กลุ่มใหม่ ", minCredits: "", parentId: "", sortOrder: "4" })).toEqual({
+    programId: 1,
     code: "2.3",
     name: "กลุ่มใหม่",
     minCredits: null,
@@ -82,11 +83,12 @@ test("หมวดวิชา: ค่าว่างของหน่วยก
     note: null,
   }));
 
-test("หมวดวิชา: ต้องมีรหัสและชื่อ", () => {
+test("หมวดวิชา: ต้องมีสาขา รหัส และชื่อ", () => {
   const r = categorySchema.safeParse({ code: "", name: " ", minCredits: "1000" });
   expect(r.success).toBe(false);
   if (!r.success) {
     expect(fieldErrors(r.error)).toEqual({
+      programId: "ไม่พบสาขาที่เลือก",
       code: "กรุณากรอกรหัสหมวด",
       name: "กรุณากรอกชื่อหมวด",
       minCredits: "ต้องเป็นจำนวนเต็ม 0–999",

@@ -6,6 +6,6 @@ process.env.DATABASE_URL = testDatabaseUrl();
 beforeEach(async () => {
   const { db } = await import("@/lib/db");
   await db.$executeRawUnsafe(
-    'TRUNCATE "Course", "Category", "User" RESTART IDENTITY CASCADE',
+    'TRUNCATE "ProgramCourse", "Course", "Category", "Program", "User" RESTART IDENTITY CASCADE',
   );
 });

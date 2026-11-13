@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { CategoryBarChart, CreditsBarChart, HoursBarChart } from "@/components/charts";
 import { getStats } from "@/lib/courses";
+import { listPrograms } from "@/lib/programs";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "สรุปภาพรวมรายวิชา" };
@@ -9,7 +11,10 @@ export const metadata: Metadata = { title: "สรุปภาพรวมรา
 const REQUIRED_CREDITS = 80;
 
 export default async function DashboardPage() {
-  const stats = await getStats();
+  // Temporary until the per-program pages: the first program is the current one.
+  const program = (await listPrograms())[0];
+  if (!program) notFound();
+  const stats = await getStats(program.id);
   const topLevel = stats.byCategory.filter((c) => c.depth === 0);
   const totalHours = stats.hours.theory + stats.hours.practice;
   const percent = (n: number) => (totalHours === 0 ? "0" : ((n / totalHours) * 100).toFixed(0));

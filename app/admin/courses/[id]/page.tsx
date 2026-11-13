@@ -5,6 +5,7 @@ import { DeleteButton } from "@/components/form";
 import { requireRoleOrLogin } from "@/lib/authz";
 import { listCategories } from "@/lib/courses";
 import { db } from "@/lib/db";
+import { listPrograms } from "@/lib/programs";
 import { deleteCourseAction, saveCourseAction } from "../actions";
 
 type Props = { params: Promise<{ id: string }> };
@@ -14,8 +15,15 @@ export default async function EditCoursePage({ params }: Props) {
   const { id: rawId } = await params;
   if (!/^\d{1,9}$/.test(rawId)) notFound();
   const id = Number(rawId);
-  const [course, categories] = await Promise.all([db.course.findUnique({ where: { id } }), listCategories()]);
-  if (!course) notFound();
+  // Temporary until the placements field: the course's place in the first program only.
+  const program = (await listPrograms())[0];
+  const [found, categories] = await Promise.all([
+    db.course.findUnique({ where: { id }, include: { placements: true } }),
+    program ? listCategories(program.id) : [],
+  ]);
+  if (!found) notFound();
+  const { placements, ...course } = found;
+  const placement = placements.find((p) => p.programId === program?.id);
 
   return (
     <div className="space-y-4">
@@ -34,7 +42,11 @@ export default async function EditCoursePage({ params }: Props) {
           />
         </div>
       </div>
-      <CourseForm action={saveCourseAction.bind(null, id)} categories={categories} course={course} />
+      <CourseForm
+        action={saveCourseAction.bind(null, id)}
+        categories={categories}
+        course={{ ...course, categoryId: placement?.categoryId ?? null, sourcePage: placement?.sourcePage ?? null }}
+      />
     </div>
   );
 }

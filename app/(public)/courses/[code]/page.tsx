@@ -39,7 +39,8 @@ export default async function CourseDetailPage({ params }: Props) {
         <Link href="/" className="link">
           รายวิชา
         </Link>
-        {course.path.map((p) => (
+        {/* Temporary until the "อยู่ในหลักสูตร" table: the path in the first program. */}
+        {(course.placements[0]?.path ?? []).map((p) => (
           <span key={p.code}> / {p.name}</span>
         ))}
       </nav>

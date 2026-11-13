@@ -4,18 +4,21 @@ import { CourseTable } from "@/components/course-table";
 import { Pagination } from "@/components/pagination";
 import { requireRoleOrLogin } from "@/lib/authz";
 import { filterToQuery, listCategories, listCreditValues, parseFilter, searchCourses } from "@/lib/courses";
+import { listPrograms } from "@/lib/programs";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function AdminCoursesPage({ searchParams }: Props) {
   await requireRoleOrLogin("ADMIN", "STAFF");
   const sp = await searchParams;
-  const filter = parseFilter(sp);
+  // Temporary until the program filter: the first program is the current one.
+  const program = (await listPrograms())[0];
+  const filter = { ...parseFilter(sp), programId: program?.id ?? null };
   const reviewOnly = sp.review === "1";
   const [result, categories, creditValues] = await Promise.all([
     searchCourses(filter, reviewOnly ? { needsReview: true } : {}),
-    listCategories(),
-    listCreditValues(),
+    program ? listCategories(program.id) : [],
+    listCreditValues(filter.programId),
   ]);
   const pageHref = (page: number) => {
     const query = filterToQuery({ ...filter, page });

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { CategoryForm } from "@/components/category-form";
 import { DeleteButton } from "@/components/form";
 import { requireRoleOrLogin } from "@/lib/authz";
 import { listCategories } from "@/lib/courses";
 import { db } from "@/lib/db";
+import { listPrograms } from "@/lib/programs";
 import { deleteCategoryAction, saveCategoryAction } from "./actions";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -13,8 +15,11 @@ export default async function AdminCategoriesPage({ searchParams }: Props) {
   const editParam = (await searchParams).edit;
   const editId = typeof editParam === "string" && /^\d{1,9}$/.test(editParam) ? Number(editParam) : null;
 
-  const categories = await listCategories();
-  const editing = editId === null ? null : await db.category.findUnique({ where: { id: editId } });
+  // Temporary until the program picker: the first program is the current one.
+  const program = (await listPrograms())[0];
+  if (!program) notFound();
+  const categories = await listCategories(program.id);
+  const editing = editId === null ? null : await db.category.findFirst({ where: { id: editId, programId: program.id } });
 
   // A category cannot be moved under itself or its own descendants.
   const start = editing ? categories.findIndex((c) => c.id === editing.id) : -1;
@@ -70,6 +75,7 @@ export default async function AdminCategoriesPage({ searchParams }: Props) {
       <CategoryForm
         key={editing?.id ?? "new"}
         action={saveCategoryAction.bind(null, editing?.id ?? null)}
+        programId={program.id}
         category={editing}
         parents={parents}
       />

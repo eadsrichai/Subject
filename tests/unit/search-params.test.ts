@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { filterToQuery, parseFilter } from "@/lib/course-filter";
 
 test("ค่าเริ่มต้น", () =>
-  expect(parseFilter({})).toEqual({ q: "", categoryId: null, credits: null, page: 1 }));
+  expect(parseFilter({})).toEqual({ programId: null, q: "", categoryId: null, credits: null, page: 1 }));
 
 test("q ถูก normalize และ trim; ช่องว่างล้วนเป็นค่าว่าง", () => {
   expect(parseFilter({ q: "  คําสั่ง " }).q).toBe("คำสั่ง");
@@ -39,7 +39,7 @@ test("filterToQuery ละค่า default", () => {
 });
 
 test("parseFilter กับ filterToQuery ไปกลับได้", () => {
-  const f = { q: "a b&c", categoryId: 7, credits: 3, page: 4 };
+  const f = { programId: null, q: "a b&c", categoryId: 7, credits: 3, page: 4 };
   const sp = Object.fromEntries(new URLSearchParams(filterToQuery(f).slice(1)));
   expect(parseFilter(sp)).toEqual(f);
 });

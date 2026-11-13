@@ -1,19 +1,24 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { CourseFilters } from "@/components/course-filters";
 import { CourseTable } from "@/components/course-table";
 import { Pagination } from "@/components/pagination";
 import { filterToQuery, listCategories, listCreditValues, parseFilter, searchCourses } from "@/lib/courses";
+import { listPrograms } from "@/lib/programs";
 
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function CourseListPage({ searchParams }: Props) {
-  const filter = parseFilter(await searchParams);
+  // Temporary until the per-program pages: the first program is the current one.
+  const program = (await listPrograms())[0];
+  if (!program) notFound();
+  const filter = { ...parseFilter(await searchParams), programId: program.id };
   const [result, categories, creditValues] = await Promise.all([
     searchCourses(filter),
-    listCategories(),
-    listCreditValues(),
+    listCategories(program.id),
+    listCreditValues(program.id),
   ]);
   const query = filterToQuery({ ...filter, page: 1 });
 

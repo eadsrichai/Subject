@@ -12,44 +12,81 @@ enum Role {
   STAFF
 }
 
+/// ปวช. / ปวส.
+enum Level {
+  PVC
+  PVS
+}
+
+model Program {
+  id         Int             @id @default(autoincrement())
+  code       String          @unique
+  level      Level
+  name       String
+  /// ประเภทวิชา
+  typeName   String
+  year       Int             @default(2567)
+  sortOrder  Int             @default(0)
+  categories Category[]
+  courses    ProgramCourse[]
+}
+
 model Category {
-  id         Int        @id @default(autoincrement())
-  code       String     @unique
+  id         Int             @id @default(autoincrement())
+  code       String
   name       String
   minCredits Int?
   note       String?
-  sortOrder  Int        @default(0)
+  sortOrder  Int             @default(0)
   parentId   Int?
-  parent     Category?  @relation("Tree", fields: [parentId], references: [id], onDelete: Restrict)
-  children   Category[] @relation("Tree")
-  courses    Course[]
+  parent     Category?       @relation("Tree", fields: [parentId], references: [id], onDelete: Restrict)
+  children   Category[]      @relation("Tree")
+  programId  Int
+  program    Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  placements ProgramCourse[]
+
+  @@unique([programId, code])
 }
 
 model Course {
-  id              Int       @id @default(autoincrement())
-  code            String    @unique
-  nameTh          String
-  nameEn          String    @default("")
-  theoryHours     Int
-  practiceHours   Int
-  credits         Int
-  standardRef     String?
-  learningOutcome String?
-  objectives      String?
-  competencies    String?
-  description     String?
-  categoryId      Int
-  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  sourcePage      Int?
-  needsReview     Boolean   @default(false)
-  reviewNote      String?
-  editedAt        DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                Int             @id @default(autoincrement())
+  code              String          @unique
+  nameTh            String
+  nameEn            String          @default("")
+  theoryHours       Int
+  practiceHours     Int
+  credits           Int
+  standardRef       String?
+  learningOutcome   String?
+  objectives        String?
+  competencies      String?
+  description       String?
+  /// เล่มที่เป็นเจ้าของเนื้อหา; null = สร้างผ่านเว็บ
+  sourceProgramCode String?
+  needsReview       Boolean         @default(false)
+  reviewNote        String?
+  editedAt          DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  placements        ProgramCourse[]
 
   @@index([code(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([nameTh(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([nameEn(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+/// ตำแหน่งของวิชาในสาขา: categoryId ต้องเป็นหมวดของ programId เดียวกัน (ตรวจในโค้ด)
+model ProgramCourse {
+  programId  Int
+  courseId   Int
+  categoryId Int
+  sourcePage Int?
+  program    Program  @relation(fields: [programId], references: [id], onDelete: Restrict)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([programId, courseId])
+  @@index([categoryId])
 }
 
 model User {

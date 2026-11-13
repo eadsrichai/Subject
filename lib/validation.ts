@@ -48,6 +48,7 @@ export const courseSchema = z.object({
 export type CourseInput = z.infer<typeof courseSchema>;
 
 export const categorySchema = z.object({
+  programId: wholeNumber(1, 2_000_000_000, "ไม่พบสาขาที่เลือก"),
   code: z.string().trim().min(1, "กรุณากรอกรหัสหมวด").max(20, "รหัสหมวดยาวเกิน 20 ตัวอักษร"),
   name: z.preprocess(thaiLine, z.string().min(1, "กรุณากรอกชื่อหมวด").max(300, "ชื่อหมวดยาวเกิน 300 ตัวอักษร")),
   minCredits: optionalWholeNumber(999, "ต้องเป็นจำนวนเต็ม 0–999"),

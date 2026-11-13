@@ -4,6 +4,8 @@ export const PAGE_SIZE = 20;
 const MAX_QUERY_LENGTH = 100;
 
 export type CourseFilter = {
+  /** null = every program (cross-program search); never read from the query string. */
+  programId: number | null;
   q: string;
   categoryId: number | null;
   credits: number | null;
@@ -18,6 +20,7 @@ const wholeNumber = (v: string) => (/^\d{1,9}$/.test(v) ? Number(v) : null);
 /** Reads the public list's query string; anything malformed falls back to "no filter". */
 export function parseFilter(sp: SearchParams): CourseFilter {
   return {
+    programId: null,
     q: normalizeThai(first(sp.q)).slice(0, MAX_QUERY_LENGTH),
     categoryId: wholeNumber(first(sp.category)),
     credits: wholeNumber(first(sp.credits)),

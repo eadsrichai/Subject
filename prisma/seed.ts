@@ -3,10 +3,21 @@
 //        npx prisma db seed -- --force (overwrites them too)
 import fs from "node:fs";
 import { PrismaClient } from "@prisma/client";
+import type { ProgramEntry } from "../lib/program-registry";
 import { ensureAdmin, seedFromExtracted } from "../lib/seed-data";
 import type { Extracted } from "../scripts/pdf/parse";
 
 const DATA_FILE = "Data/extracted/courses.json";
+
+// The only program for now; the registry file (Data/programs.json) replaces this.
+const PROGRAM: ProgramEntry = {
+  code: "31901",
+  level: "PVS",
+  name: "เทคโนโลยีสารสนเทศ",
+  typeName: "อุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ",
+  pdf: "31901v7_18_10_68.pdf",
+  pages: [37, 106],
+};
 
 async function main() {
   const email = process.env.ADMIN_EMAIL;
@@ -19,7 +30,7 @@ async function main() {
   const db = new PrismaClient();
   try {
     const force = process.argv.includes("--force");
-    const r = await seedFromExtracted(db, data, { force });
+    const r = await seedFromExtracted(db, PROGRAM, data, { force });
     console.log(`รายวิชา: เพิ่ม ${r.created}, อัปเดต ${r.updated}, ข้าม (แก้ไขผ่านเว็บแล้ว) ${r.skipped}`);
     await ensureAdmin(db, email, password);
     console.log(`บัญชีผู้ดูแลระบบ: ${email.trim().toLowerCase()}`);

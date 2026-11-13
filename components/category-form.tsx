@@ -6,20 +6,24 @@ import { Field, FieldError, FormError, useFormAction } from "./form";
 
 type Props = {
   action: (formData: FormData) => Promise<ActionResult>;
+  /** The program a new category is added to. */
+  programId: number;
   /** null when adding a new category. */
   category: { code: string; name: string; minCredits: number | null; parentId: number | null; sortOrder: number } | null;
   /** Categories that may be chosen as the parent. */
   parents: { id: number; code: string; name: string; depth: number }[];
 };
 
-export function CategoryForm({ action, category, parents }: Props) {
+export function CategoryForm({ action, programId, category, parents }: Props) {
   const { formAction, pending, errors, value, saved, attempt } = useFormAction(action);
   const editing = category !== null;
 
   return (
     <form key={attempt} action={formAction} className="card space-y-4 p-5">
       <h2 className="font-semibold">{editing ? `แก้ไขหมวด ${category.code}` : "เพิ่มหมวดวิชา"}</h2>
+      <input type="hidden" name="programId" value={programId} />
       <FormError message={errors._} />
+      <FormError message={errors.programId} />
       {saved && !editing && <p className="text-sm text-teal-800">เพิ่มหมวดวิชาแล้ว</p>}
 
       <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">

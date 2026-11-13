@@ -13,6 +13,7 @@ const item = (over: Partial<CourseListItem>): CourseListItem => ({
   credits: 3,
   categoryName: "กลุ่มสมรรถนะวิชาชีพพื้นฐาน",
   needsReview: false,
+  programs: [],
   ...over,
 });
 

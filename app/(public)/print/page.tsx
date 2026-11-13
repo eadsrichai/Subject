@@ -1,15 +1,20 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { CourseTable } from "@/components/course-table";
 import { PrintButton } from "@/components/print-button";
 import { allMatchingCourses, filterToQuery, listCategories, parseFilter } from "@/lib/courses";
+import { listPrograms } from "@/lib/programs";
 
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function PrintPage({ searchParams }: Props) {
-  const filter = parseFilter(await searchParams);
-  const [items, categories] = await Promise.all([allMatchingCourses(filter), listCategories()]);
+  // Temporary until the per-program pages: the first program is the current one.
+  const program = (await listPrograms())[0];
+  if (!program) notFound();
+  const filter = { ...parseFilter(await searchParams), programId: program.id };
+  const [items, categories] = await Promise.all([allMatchingCourses(filter), listCategories(program.id)]);
   const category = categories.find((c) => c.id === filter.categoryId);
 
   const conditions = [

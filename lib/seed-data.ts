@@ -1,20 +1,30 @@
 import type { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import type { Extracted } from "../scripts/pdf/parse";
+import type { ProgramEntry } from "./program-registry";
 
 const UNCATEGORISED = { code: "NONE", name: "ยังไม่จัดหมวด" };
 
 /**
- * Loads extracted curriculum data. Safe to re-run: rows are matched by code,
- * and courses edited on the website (and every existing category) are left alone unless `force`.
+ * Loads one program's extracted curriculum data. Safe to re-run: rows are matched by code,
+ * and courses edited on the website (and every existing program, category and placement)
+ * are left alone unless `force`.
  */
 export async function seedFromExtracted(
   db: PrismaClient,
+  program: ProgramEntry,
   data: Extracted,
   opts: { force?: boolean } = {},
 ): Promise<{ created: number; updated: number; skipped: number }> {
-  const categoryIds = new Map<string, number>();
+  // Programs, categories and placements carry no edit stamp, so any existing row may have been changed on the website.
+  const programFields = { level: program.level, name: program.name, typeName: program.typeName };
+  const { id: programId } = await db.program.upsert({
+    where: { code: program.code },
+    create: { code: program.code, ...programFields },
+    update: opts.force ? programFields : {},
+  });
 
+  const categoryIds = new Map<string, number>();
   // Parents first, so every child can point at an existing row.
   const byDepth = [...data.categories].sort(
     (a, b) => a.code.split(".").length - b.code.split(".").length,
@@ -26,10 +36,9 @@ export async function seedFromExtracted(
       sortOrder: cat.sortOrder,
       parentId: cat.parentCode ? (categoryIds.get(cat.parentCode) ?? null) : null,
     };
-    // Categories carry no edit stamp, so any existing row may have been changed on the website.
     const row = await db.category.upsert({
-      where: { code: cat.code },
-      create: { code: cat.code, ...fields },
+      where: { programId_code: { programId, code: cat.code } },
+      create: { programId, code: cat.code, ...fields },
       update: opts.force ? fields : {},
     });
     categoryIds.set(cat.code, row.id);
@@ -41,8 +50,8 @@ export async function seedFromExtracted(
     const reasons = [...c.reviewReasons];
     if (categoryId === undefined) {
       const none = await db.category.upsert({
-        where: { code: UNCATEGORISED.code },
-        create: { ...UNCATEGORISED, sortOrder: 999 },
+        where: { programId_code: { programId, code: UNCATEGORISED.code } },
+        create: { programId, ...UNCATEGORISED, sortOrder: 999 },
         update: {},
       });
       categoryId = none.id;
@@ -60,23 +69,31 @@ export async function seedFromExtracted(
       objectives: c.objectives,
       competencies: c.competencies,
       description: c.description,
-      sourcePage: c.sourcePage,
-      categoryId,
+      sourceProgramCode: program.code,
       needsReview: reasons.length > 0,
       reviewNote: reasons.length > 0 ? reasons.join("; ") : null,
       editedAt: null,
     };
 
     const existing = await db.course.findUnique({ where: { code: c.code } });
+    let courseId: number;
     if (!existing) {
-      await db.course.create({ data: { code: c.code, ...fields } });
+      courseId = (await db.course.create({ data: { code: c.code, ...fields } })).id;
       result.created++;
     } else if (existing.editedAt && !opts.force) {
+      courseId = existing.id;
       result.skipped++;
     } else {
-      await db.course.update({ where: { id: existing.id }, data: fields });
+      courseId = (await db.course.update({ where: { id: existing.id }, data: fields })).id;
       result.updated++;
     }
+
+    const placement = { categoryId, sourcePage: c.sourcePage };
+    await db.programCourse.upsert({
+      where: { programId_courseId: { programId, courseId } },
+      create: { programId, courseId, ...placement },
+      update: opts.force ? placement : {},
+    });
   }
   return result;
 }
