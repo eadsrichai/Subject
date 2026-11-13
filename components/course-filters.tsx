@@ -1,6 +1,7 @@
 "use client";
 
 import type { CourseFilter } from "@/lib/course-filter";
+import { withBasePath } from "@/lib/base-path";
 
 type Props = {
   action: string;
@@ -23,7 +24,7 @@ export function CourseFilters({ action, filter, categories, creditValues, review
   return (
     <form
       method="get"
-      action={action}
+      action={withBasePath(action)}
       role="search"
       className={`card grid gap-3 p-4 sm:items-end ${
         categories ? "sm:grid-cols-[2fr_2fr_1fr_auto]" : "sm:grid-cols-[4fr_1fr_auto]"

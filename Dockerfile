@@ -7,6 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# เว็บอยู่ใต้ path นี้ เช่น http://server/course (ค่าว่าง = อยู่ที่ราก)
+# ต้องมีทั้งตอน build และตอนรัน next start จึงตั้งไว้ใน base stage
+ARG NEXT_PUBLIC_BASE_PATH=/course
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 
 FROM base AS deps
 COPY package.json package-lock.json ./

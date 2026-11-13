@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Level } from "@prisma/client";
 import { levelLabel, listPrograms } from "@/lib/programs";
+import { withBasePath } from "@/lib/base-path";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function ProgramListPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">หลักสูตร</h1>
 
-      <form method="get" action="/search" role="search" className="card flex flex-wrap items-end gap-3 p-4">
+      <form method="get" action={withBasePath("/search")} role="search" className="card flex flex-wrap items-end gap-3 p-4">
         <div className="min-w-0 flex-1">
           <label htmlFor="q" className="field-label">
             ค้นหา

@@ -4,6 +4,7 @@ import { CourseTable } from "@/components/course-table";
 import { Pagination } from "@/components/pagination";
 import { filterToQuery, listCategories, listCreditValues, parseFilter, searchCourses } from "@/lib/courses";
 import { programFromParams } from "./program";
+import { withBasePath } from "@/lib/base-path";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function ProgramCoursesPage({ params, searchParams }: Props
         <p className="text-sm text-slate-600">พบ {result.total} รายวิชา</p>
         {result.total > 0 && (
           <div className="flex gap-2">
-            <a href={`/api/export${exportQuery}`} className="btn-secondary">
+            <a href={withBasePath(`/api/export${exportQuery}`)} className="btn-secondary">
               ส่งออก Excel
             </a>
             <Link href={`${base}/print${query}`} className="btn-secondary">

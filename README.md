@@ -46,13 +46,14 @@ npm run dev                   # http://localhost:3000
 
 ```bash
 docker compose --profile app pull                          # ดึง image ล่าสุด (หรือ build เองด้วย --profile app build)
-docker compose --profile app up -d                         # ฐานข้อมูล + เว็บที่ http://localhost (พอร์ต 80)
+docker compose --profile app up -d                         # ฐานข้อมูล + เว็บที่ http://localhost/course (พอร์ต 80)
 docker compose --profile app run --rm app npx prisma db seed   # นำเข้าข้อมูลครั้งแรก
 ```
 
 - container จะรัน `prisma migrate deploy` ทุกครั้งก่อนเปิดเว็บ
 - ค่า `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` อ่านจาก `.env`
 - เว็บเปิดที่พอร์ต 80 ถ้าพอร์ตนี้มีโปรแกรมอื่นใช้อยู่ ให้ใส่ `APP_PORT=8080` (หรือพอร์ตอื่น) ใน `.env`
+- image ที่ build ด้วย Dockerfile จะเปิดเว็บใต้ `/course` (เข้า `/` จะถูกพาไป `/course`) ถ้าจะเปลี่ยน path ให้ build ด้วย `--build-arg NEXT_PUBLIC_BASE_PATH=/อื่น` หรือใส่ค่าว่างให้อยู่ที่ราก ส่วน `npm run dev` ยังอยู่ที่ราก
 - image ใน ghcr.io เป็น private ตั้งแต่แรก ถ้าจะให้คนอื่นดึงได้ ต้องเปลี่ยนเป็น public ที่ Package settings บน GitHub
 - ห้ามรัน `docker compose down -v` บน server เพราะจะลบฐานข้อมูลทั้งหมด
 

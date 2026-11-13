@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
+import { withBasePath } from "@/lib/base-path";
 
 export type LoginState = { error?: string };
 
@@ -10,7 +11,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     await signIn("credentials", {
       email: String(formData.get("email") ?? ""),
       password: String(formData.get("password") ?? ""),
-      redirectTo: "/admin",
+      redirectTo: withBasePath("/admin"),
     });
   } catch (err) {
     // Same message whether the email is unknown, the password is wrong, or the account is disabled.
@@ -21,5 +22,5 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 }
 
 export async function logout() {
-  await signOut({ redirectTo: "/login" });
+  await signOut({ redirectTo: withBasePath("/login") });
 }
