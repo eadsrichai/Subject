@@ -17,5 +17,23 @@ services:
       timeout: 3s
       retries: 30
 
+  # เว็บแบบ container: docker compose --profile app up -d
+  # (ไม่ใส่ --profile จะเปิดแค่ฐานข้อมูล สำหรับ npm run dev)
+  app:
+    profiles: ["app"]
+    image: ghcr.io/eadsrichai/subject:latest
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://courses:courses@db:5432/courses
+      AUTH_SECRET: ${AUTH_SECRET:?ต้องกำหนด AUTH_SECRET ใน .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+
 volumes:
   pgdata:

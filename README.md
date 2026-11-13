@@ -36,6 +36,20 @@ npm run dev                   # http://localhost:3000
 
 สร้าง `AUTH_SECRET` ได้ด้วย `openssl rand -base64 32`
 
+## รันแบบ container
+
+ทุกครั้งที่ push เข้า `main` GitHub Actions จะ build image แล้วส่งขึ้น `ghcr.io/eadsrichai/subject:latest` (ดู `.github/workflows/container.yml`)
+
+```bash
+docker compose --profile app pull                          # ดึง image ล่าสุด (หรือ build เองด้วย --profile app build)
+docker compose --profile app up -d                         # ฐานข้อมูล + เว็บที่ http://localhost:3000
+docker compose --profile app run --rm app npx prisma db seed   # นำเข้าข้อมูลครั้งแรก
+```
+
+- container จะรัน `prisma migrate deploy` ทุกครั้งก่อนเปิดเว็บ
+- ค่า `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` อ่านจาก `.env`
+- image ใน ghcr.io เป็น private ตั้งแต่แรก ถ้าจะให้คนอื่นดึงได้ ต้องเปลี่ยนเป็น public ที่ Package settings บน GitHub
+
 ## บัญชีผู้ใช้
 
 - บัญชีผู้ดูแลระบบคนแรกสร้างจาก `ADMIN_EMAIL` / `ADMIN_PASSWORD` ตอน seed (รหัสผ่านอย่างน้อย 8 ตัวอักษร)
