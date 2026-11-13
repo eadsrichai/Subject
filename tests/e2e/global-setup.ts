@@ -1,20 +1,12 @@
 import { execSync } from "node:child_process";
 import bcrypt from "bcryptjs";
-import type { ProgramEntry } from "../../lib/program-registry";
+import { loadRegistry } from "../../lib/program-registry";
 import { sampleData } from "../fixtures/sample-data";
 import { testDatabaseUrl } from "../test-env";
 
 export const TEST_PASSWORD = "password-1234";
 
-/** Same entry as 31901 in Data/programs.json. */
-const PROGRAM_31901: ProgramEntry = {
-  code: "31901",
-  level: "PVS",
-  name: "เทคโนโลยีสารสนเทศ",
-  typeName: "อุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ",
-  pdf: "31901v7_18_10_68.pdf",
-  pages: [37, 106],
-};
+const PROGRAM_31901 = loadRegistry().find((p) => p.code === "31901")!;
 
 export default async function globalSetup() {
   const url = testDatabaseUrl();

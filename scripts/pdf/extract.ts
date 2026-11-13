@@ -1,22 +1,26 @@
-// One-off import: curriculum PDF → Data/extracted/courses.json + report.txt
-// Usage: npm run extract
+// Curriculum PDF → Data/extracted/<code>.json + <code>.report.txt, driven by Data/programs.json
+// Usage: npm run extract -- [code…]   (no code = every program in the registry)
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { extractedPath, loadRegistry, reportPath, type ProgramEntry } from "../../lib/program-registry";
 import { buildLines, type Item, type Line } from "./lines";
 import { parseDocument } from "./parse";
 
-const PDF_PATH = "Data/31901v7_18_10_68.pdf";
-const OUT_DIR = "Data/extracted";
-const FIRST_PAGE = 37; // curriculum structure starts here
-const LAST_PAGE = 106; // scanned appendix follows
+/** Returns false when the program was read but yielded no courses. */
+async function extractProgram(program: ProgramEntry): Promise<boolean> {
+  const pdfPath = `Data/${program.pdf}`;
+  const [firstPage, lastPage] = program.pages;
+  if (!fs.existsSync(pdfPath)) {
+    console.log(`ข้าม ${program.code}: ไม่พบไฟล์ ${pdfPath}`);
+    return true;
+  }
 
-async function main() {
   const pdfjsRoot = path.resolve("node_modules/pdfjs-dist");
   const assetUrl = (dir: string) => pathToFileURL(path.join(pdfjsRoot, dir)).href + "/";
   const doc = await getDocument({
-    data: new Uint8Array(fs.readFileSync(PDF_PATH)),
+    data: new Uint8Array(fs.readFileSync(pdfPath)),
     cMapUrl: assetUrl("cmaps"),
     cMapPacked: true,
     standardFontDataUrl: assetUrl("standard_fonts"),
@@ -24,7 +28,7 @@ async function main() {
   }).promise;
 
   const lines: Line[] = [];
-  for (let p = FIRST_PAGE; p <= Math.min(LAST_PAGE, doc.numPages); p++) {
+  for (let p = firstPage; p <= Math.min(lastPage, doc.numPages); p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     const items: Item[] = [];
@@ -37,7 +41,7 @@ async function main() {
   const data = parseDocument(lines);
   const flagged = data.courses.filter((c) => c.needsReview);
   const report = [
-    `แหล่งข้อมูล: ${PDF_PATH} หน้า ${FIRST_PAGE}–${LAST_PAGE}`,
+    `แหล่งข้อมูล: ${pdfPath} หน้า ${firstPage}–${lastPage}`,
     `หมวด/กลุ่มวิชา: ${data.categories.length}`,
     `รายวิชาทั้งหมด: ${data.courses.length}`,
     "",
@@ -53,15 +57,30 @@ async function main() {
     "",
   ].join("\n");
 
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  fs.writeFileSync(path.join(OUT_DIR, "courses.json"), JSON.stringify(data, null, 1) + "\n");
-  fs.writeFileSync(path.join(OUT_DIR, "report.txt"), report);
+  fs.mkdirSync(path.dirname(extractedPath(program.code)), { recursive: true });
+  fs.writeFileSync(extractedPath(program.code), JSON.stringify(data, null, 1) + "\n");
+  fs.writeFileSync(reportPath(program.code), report);
   console.log(report);
 
   if (data.courses.length === 0) {
-    console.error("ไม่พบรายวิชาเลย ตรวจสอบไฟล์ PDF และช่วงหน้า");
+    console.error(`${program.code}: ไม่พบรายวิชาเลย ตรวจสอบไฟล์ PDF และช่วงหน้า`);
+    return false;
+  }
+  return true;
+}
+
+async function main() {
+  const registry = loadRegistry();
+  const codes = process.argv.slice(2);
+  const unknown = codes.filter((c) => !registry.some((p) => p.code === c));
+  if (unknown.length > 0) {
+    console.error(`ไม่พบรหัสสาขา ${unknown.join(", ")} ในทะเบียน Data/programs.json`);
     process.exit(1);
   }
+  const selected = codes.length > 0 ? registry.filter((p) => codes.includes(p.code)) : registry;
+  let ok = true;
+  for (const program of selected) ok = (await extractProgram(program)) && ok;
+  if (!ok) process.exit(1);
 }
 
 main().catch((err) => {

@@ -17,7 +17,7 @@ npm install
 cp .env.example .env          # แล้วแก้ AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose up -d          # PostgreSQL ที่พอร์ต 5432 (สร้างฐาน courses และ courses_test)
 npx prisma migrate deploy
-npm run extract               # PDF → Data/extracted/courses.json และ report.txt
+npm run extract               # PDF → Data/extracted/<รหัสสาขา>.json และ <รหัสสาขา>.report.txt
 npx prisma db seed            # นำเข้ารายวิชา และสร้างบัญชีผู้ดูแลระบบคนแรก
 npm run dev                   # http://localhost:3000
 ```
@@ -44,7 +44,7 @@ npx prisma db seed              # ข้ามรายวิชาที่ถ�
 npx prisma db seed -- --force   # เขียนทับทุกวิชาด้วยข้อมูลจาก PDF (การแก้ไขผ่านเว็บจะหาย)
 ```
 
-`Data/extracted/report.txt` สรุปจำนวนวิชาต่อหมวดและรายวิชาที่ต้องตรวจสอบ
+`Data/extracted/<รหัสสาขา>.report.txt` สรุปจำนวนวิชาต่อหมวดและรายวิชาที่ต้องตรวจสอบ
 วิชาที่ต้องตรวจสอบแสดงในหน้า `/admin` พร้อมเหตุผล
 
 ### ข้อจำกัดของข้อมูลจาก PDF

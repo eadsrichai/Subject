@@ -1,23 +1,15 @@
-// Loads Data/extracted/courses.json into the database and creates the first admin.
+// Loads Data/extracted/31901.json into the database and creates the first admin.
 // Usage: npx prisma db seed            (keeps courses edited on the website)
 //        npx prisma db seed -- --force (overwrites them too)
 import fs from "node:fs";
 import { PrismaClient } from "@prisma/client";
-import type { ProgramEntry } from "../lib/program-registry";
+import { extractedPath, loadRegistry } from "../lib/program-registry";
 import { ensureAdmin, seedFromExtracted } from "../lib/seed-data";
 import type { Extracted } from "../scripts/pdf/parse";
 
-const DATA_FILE = "Data/extracted/courses.json";
-
-// The only program for now; the registry file (Data/programs.json) replaces this.
-const PROGRAM: ProgramEntry = {
-  code: "31901",
-  level: "PVS",
-  name: "เทคโนโลยีสารสนเทศ",
-  typeName: "อุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ",
-  pdf: "31901v7_18_10_68.pdf",
-  pages: [37, 106],
-};
+// Task 4 loops over every program; until then only 31901 is seeded.
+const PROGRAM = loadRegistry().find((p) => p.code === "31901")!;
+const DATA_FILE = extractedPath(PROGRAM.code);
 
 async function main() {
   const email = process.env.ADMIN_EMAIL;
